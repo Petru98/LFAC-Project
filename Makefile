@@ -3,12 +3,12 @@ RM := rm -f
 NAME := tema
 
 CC   := gcc
-LEX  := lex
-YACC := yacc
+LEX  := flex
+YACC := bison
 
 CCFLAGS   := -O3
-LEXFLAGS  := --yylineno
-YACCFLAGS := -d
+LEXFLAGS  :=
+YACCFLAGS := --yacc
 
 SRCLEX  := $(NAME).l
 SRCYACC := $(NAME).y
@@ -36,4 +36,11 @@ $(OUTYACC): $(SRCYACC)
 clean:
 	@$(RM) $(NAME) $(OUTLEX) $(OUTYACC)
 
-.PHONY: all clean # These targets don't represent files
+
+
+test: all
+	@./$(NAME) < test.txt
+
+
+
+.PHONY: all clean test # These targets don't represent files

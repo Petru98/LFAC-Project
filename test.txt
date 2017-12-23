@@ -1,0 +1,8 @@
+// This is a comment
+
+/*Multiline
+* / comment
+*/ /**/ /*/this comment is
+not
+closed
+a
