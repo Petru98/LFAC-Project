@@ -42,8 +42,17 @@ extern YYLTYPE yylloc;
 /******************************************************************************/
 %%
     /* Types and ids */
-"int"|"float"|"char"|"string" {return Type;}
-[_a-zA-Z][_a-zA-Z0-9]*        {return Id;}
+"int"                  {return TypeInt;}
+"float"                {return TypeFloat;}
+"char"                 {return TypeChar;}
+"string"               {return TypeString;}
+[_a-zA-Z][_a-zA-Z0-9]* {return Id;}
+
+    /* Constants */
+(0|[1-9][0-9]*)       {return Int;}
+([0-9]?\.[0-9]+)(f|F) {return Float;}
+\'(.)\'               {return Char;}
+\"([^"\n]|\\\")*\"    {return String;}
 
 
 

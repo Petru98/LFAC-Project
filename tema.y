@@ -27,8 +27,10 @@ typedef struct yyltype
 %locations
 
 /* Tokens */
-%start ProgramStart
-%token Type Id
+%start Pgm
+%token TypeInt TypeFloat TypeChar TypeString
+%token Id
+%token Int Float Char String
 
 
 
@@ -36,7 +38,20 @@ typedef struct yyltype
 /*********************************** Rules ************************************/
 /******************************************************************************/
 %%
-ProgramStart : ;
+Pgm : ;
+
+Const  : Int
+       | Float
+       | Char
+       | String
+       ;
+Consts : Const
+       | Const Const
+       ;
+
+Ids : Id
+    | Id Id
+    ;
 
 
 
