@@ -6,6 +6,7 @@
 %{
 #include <stdio.h>
 #include <stdint.h>
+#include "String.h"
 
 extern int yylineno;
 void yyerror(const char* msg);
@@ -28,9 +29,9 @@ typedef struct yyltype
 
 /* Tokens */
 %start Pgm
-%token TypeInt TypeFloat TypeChar TypeString
-%token Id
-%token Int Float Char String
+%token INT BOOL FLOAT CHAR STRING VOID IF WHILE FOR CLASS
+%token ID
+%token INT_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
 
 
 
@@ -40,17 +41,17 @@ typedef struct yyltype
 %%
 Pgm : ;
 
-Const  : Int
-       | Float
-       | Char
-       | String
+Const  : INT_CONSTANT
+       | FLOAT_CONSTANT
+       | CHAR_CONSTANT
+       | STRING_LITERAL
        ;
 Consts : Const
        | Const Const
        ;
 
-Ids : Id
-    | Id Id
+Ids : ID
+    | ID ID
     ;
 
 

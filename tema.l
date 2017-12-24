@@ -41,18 +41,32 @@ extern YYLTYPE yylloc;
 /*********************************** Rules ************************************/
 /******************************************************************************/
 %%
-    /* Types and ids */
-"int"                  {return TypeInt;}
-"float"                {return TypeFloat;}
-"char"                 {return TypeChar;}
-"string"               {return TypeString;}
-[_a-zA-Z][_a-zA-Z0-9]* {return Id;}
+    /* Keywords */
+"int"    {return INT;}
+"bool"   {return BOOL;}
+"float"  {return FLOAT;}
+"char"   {return CHAR;}
+"string" {return STRING;}
+"void"   {return VOID;}
+"if"     {return IF;}
+"while"  {return WHILE;}
+"for"    {return FOR;}
+"class"  {return CLASS;}
+
+
+
+    /* Id */
+[_a-zA-Z][_a-zA-Z0-9]* {return ID;}
 
     /* Constants */
-(0|[1-9][0-9]*)       {return Int;}
-([0-9]?\.[0-9]+)(f|F) {return Float;}
-\'(.)\'               {return Char;}
-\"([^"\n]|\\\")*\"    {return String;}
+(0|[1-9][0-9]*)       {return INT_CONSTANT;}
+([0-9]?\.[0-9]+)(f|F) {return FLOAT_CONSTANT;}
+\'(.)\'               {return CHAR_CONSTANT;}
+\"([^"\n]|\\\")*\"    {return STRING_LITERAL;}
+
+
+
+    /* Operators */
 
 
 

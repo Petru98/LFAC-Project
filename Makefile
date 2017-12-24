@@ -28,13 +28,13 @@ $(NAME): $(OUTLEX) $(OUTYACC)
 $(OUTLEX): $(SRCLEX)
 	$(LEX) -o $@ $(LEXFLAGS) $(SRCLEX)
 
-$(OUTYACC): $(SRCYACC)
+$(OUTYACC): $(SRCYACC) String.h
 	$(YACC) -o $@ $(YACCFLAGS) $(SRCYACC)
 
 
 
 clean:
-	@$(RM) $(NAME) $(OUTLEX) $(OUTYACC)
+	@$(RM) $(NAME) $(OUTLEX) $(OUTYACC) $(OUTYACC:.c=.h)
 
 
 
