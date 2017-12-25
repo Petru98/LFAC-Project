@@ -1,5 +1,7 @@
 // This is a comment
 
+int a;
+
 /*Multiline
 * / comment
 */ /**/ /*/this comment is

@@ -41,6 +41,13 @@ extern YYLTYPE yylloc;
 /*********************************** Rules ************************************/
 /******************************************************************************/
 %%
+    /* Comments */
+"//".*                 {}
+"/**/"                 {}
+"/*"([^*\n]|\*[^/\n])* {skipMultilineComment();}
+
+
+
     /* Keywords */
 "int"    {return INT;}
 "bool"   {return BOOL;}
@@ -55,25 +62,57 @@ extern YYLTYPE yylloc;
 
 
 
-    /* Id */
-[_a-zA-Z][_a-zA-Z0-9]* {return ID;}
-
     /* Constants */
 (0|[1-9][0-9]*)       {return INT_CONSTANT;}
+("false"|"true")      {return BOOL_CONSTANT;}
 ([0-9]?\.[0-9]+)(f|F) {return FLOAT_CONSTANT;}
 \'(.)\'               {return CHAR_CONSTANT;}
 \"([^"\n]|\\\")*\"    {return STRING_LITERAL;}
 
 
 
-    /* Operators */
+    /* Id */
+[_a-zA-Z][_a-zA-Z0-9]* {return ID;}
 
 
 
-    /* Comments */
-"//".*                 {}
-"/**/"                 {}
-"/*"([^*\n]|\*[^/\n])* {skipMultilineComment();}
+    /* Operators and punctuation */
+"+=" {return ADD_ASSIGN;}
+"-=" {return SUB_ASSIGN;}
+"*=" {return MUL_ASSIGN;}
+"/=" {return DIV_ASSIGN;}
+"%=" {return MOD_ASSIGN;}
+"++" {return INC_OP;}
+"--" {return DEC_OP;}
+"&&" {return AND_OP;}
+"||" {return OR_OP;}
+"==" {return EQ_OP;}
+"!=" {return NE_OP;}
+"<=" {return LE_OP;}
+">=" {return GE_OP;}
+"->" {return PTR_OP;}
+";"  {return ';';}
+","  {return ',';}
+":"  {return ':';}
+"{"  {return '{';}
+"}"  {return '}';}
+"("  {return '(';}
+")"  {return ')';}
+"["  {return '[';}
+"]"  {return ']';}
+"<"  {return '<';}
+">"  {return '>';}
+"="  {return '=';}
+"+"  {return '+';}
+"-"  {return '-';}
+"*"  {return '*';}
+"/"  {return '/';}
+"%"  {return '%';}
+"!"  {return '!';}
+"."  {return '.';}
+"?"  {return '?';}
+
+
 
     /* New line. Force lex to update yylineno and update yycolumnno manually */
 [ \t\v\r]*\n  {yycolumnno = 1;}
@@ -81,8 +120,9 @@ extern YYLTYPE yylloc;
     /* Any whitespace except new line */
 [ \t\v]+      {}
 
-    /* Anything else that does not contain whitespaces */
-[^ \t\v\r\n]+ {yyerror("unknown token");}
+    /* Anything else. Let yacc decide if the token is actually 2 valid tokens concatenated */
+    /* This is for situations where tokens are not separated by whitespace like: variable_name; */
+.             {return (*yytext);}
 
 
 

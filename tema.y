@@ -31,7 +31,13 @@ typedef struct yyltype
 %start Pgm
 %token INT BOOL FLOAT CHAR STRING VOID IF WHILE FOR CLASS
 %token ID
-%token INT_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
+%token INT_CONSTANT BOOL_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
+%token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
+
+/* Precedence */
+%left '+' '-'
+%left '*' '/' '%'
+%left '('')'
 
 
 
@@ -39,20 +45,41 @@ typedef struct yyltype
 /*********************************** Rules ************************************/
 /******************************************************************************/
 %%
-Pgm : ;
+Pgm :
+    | Stmts
+    ;
+
+
+
+Exp :
+    ;
+
+
+
+Stmt  : DeclVar ';'
+      ;
+Stmts : Stmt
+      | Stmt Stmt
+      ;
+
+
+
+DeclVar : TypeVar ID
+        ;
+
+
+TypeVar : INT
+        | BOOL
+        | FLOAT
+        | STRING
+        | CHAR
 
 Const  : INT_CONSTANT
+       | BOOL_CONSTANT
        | FLOAT_CONSTANT
        | CHAR_CONSTANT
        | STRING_LITERAL
        ;
-Consts : Const
-       | Const Const
-       ;
-
-Ids : ID
-    | ID ID
-    ;
 
 
 
