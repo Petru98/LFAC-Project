@@ -1,6 +1,7 @@
 // This is a comment
 
-int a;
+int a, x, _231 = 17;
+a = a + 1;
 
 /*Multiline
 * / comment
