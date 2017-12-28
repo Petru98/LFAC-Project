@@ -1,9 +1,14 @@
+int x = 0, y = 0;
+int a[100][100][100][100], b[100];
+double m = 0.0;
+
+x = 2 + y;
+
+
+
 // This is a comment
 
-int a, x, _231 = 17;
-a = a + 1;
-
-/*Multiline
+/*Multi-line
 * / comment
 */ /**/ /*/this comment is
 not

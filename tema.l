@@ -51,6 +51,7 @@ extern YYLTYPE yylloc;
     /* Keywords */
 "int"    {return INT;}
 "bool"   {return BOOL;}
+"double" {return DOUBLE;}
 "float"  {return FLOAT;}
 "char"   {return CHAR;}
 "string" {return STRING;}
@@ -65,6 +66,7 @@ extern YYLTYPE yylloc;
     /* Constants */
 (0|[1-9][0-9]*)       {return INT_CONSTANT;}
 ("false"|"true")      {return BOOL_CONSTANT;}
+([0-9]?\.[0-9]+)      {return DOUBLE_CONSTANT;}
 ([0-9]?\.[0-9]+)(f|F) {return FLOAT_CONSTANT;}
 \'(.)\'               {return CHAR_CONSTANT;}
 \"([^"\n]|\\\")*\"    {return STRING_LITERAL;}

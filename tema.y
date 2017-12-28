@@ -29,9 +29,9 @@ typedef struct yyltype
 
 /* Tokens */
 %start Pgm
-%token INT BOOL FLOAT CHAR STRING VOID IF WHILE FOR CLASS
+%token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF WHILE FOR CLASS
 %token ID
-%token INT_CONSTANT BOOL_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
+%token INT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
 
 /* Precedence */
@@ -58,12 +58,13 @@ Pgm :
 
 
 Stmts : Stmt
-      | Stmt Stmt
+      | Stmt Stmts
       ;
 Stmt  : ';'
       | DeclVar ';'
       | Exp ';'
       | '{' Stmt '}'
+      | '{'      '}'
       ;
 
 
@@ -75,12 +76,13 @@ Exp  : ID
      | INT_CONSTANT
      | BOOL_CONSTANT
      | FLOAT_CONSTANT
+     | DOUBLE_CONSTANT
      | CHAR_CONSTANT
 
-     | INC_OP Exp
-     | DEC_OP Exp
-     | Exp INC_OP
-     | Exp DEC_OP
+     | INC_OP ID
+     | DEC_OP ID
+     | ID INC_OP
+     | ID DEC_OP
 
      | Exp '+' Exp
      | Exp '-' Exp
@@ -110,6 +112,7 @@ DeclVar : TypeVar InitVarList
 
 TypeVar : INT
         | BOOL
+        | DOUBLE
         | FLOAT
         | STRING
         | CHAR
@@ -119,7 +122,26 @@ InitVarList : InitVar
             ;
 InitVar     : ID
             | ID '=' Exp
+            | ID ArrayIndexing
             ;
+
+ArrayIndexing : '[' ConstAExp ']'
+              | '[' ConstAExp ']' ArrayIndexing
+              ;
+
+ConstAExp : INT_CONSTANT
+
+          | ConstAExp '+' ConstAExp
+          | ConstAExp '-' ConstAExp
+          | ConstAExp '*' ConstAExp
+          | ConstAExp '/' ConstAExp
+          | ConstAExp '%' ConstAExp
+          | '-' ConstAExp           %prec ','
+
+          | '(' ConstAExp ')'
+          ;
+
+
 
 Const  : INT_CONSTANT
        | BOOL_CONSTANT
