@@ -29,7 +29,7 @@ typedef struct yyltype
 
 /* Tokens */
 %start Pgm
-%token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
+%token INT BOOL DOUBLE FLOAT CHAR STRING CONST VOID IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
 %token ID
 %token INT_CONSTANT UINT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
@@ -150,6 +150,7 @@ TypeVar : INT
         ;
 
 DeclVar : TypeVar InitVarList
+        | CONST TypeVar InitConstVarList
         ;
 
 InitVarList : InitVar
@@ -159,6 +160,12 @@ InitVar     : ID
             | ID '=' Exp
             | ID ArrayDeclSize
             ;
+
+InitConstVarList : InitConstVar
+                 | InitConstVar ',' InitConstVarList
+                 ;
+InitConstVar     : ID '=' Exp
+                 ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
               | '[' ConstIntExp ']' ArrayDeclSize
