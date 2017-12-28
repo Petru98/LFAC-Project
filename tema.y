@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include "String.h"
 
-extern int yylineno;
 void yyerror(const char* msg);
 void yywarning(const char* msg);
 int yylex();
@@ -21,6 +20,8 @@ typedef struct yyltype
     size_t last_line;
     size_t last_column;
 } yyltype;
+
+extern int scope_level;
 %}
 
 /* Flags for yacc */
@@ -32,7 +33,7 @@ typedef struct yyltype
 %token INT BOOL DOUBLE FLOAT CHAR STRING VOID CONST PRINT IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
 %token ID
 %token INT_CONSTANT UINT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
-%token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
+%token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP
 
 /* Precedence */
 %left ','

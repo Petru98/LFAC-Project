@@ -26,6 +26,13 @@ for(; x <= y; ++x)
 
 int sum(int x, int y)
 {
+    int a;
+    {
+        {
+            float b;
+        }
+        string c;
+    }
     return x + y;
 }
 void out(int x)
