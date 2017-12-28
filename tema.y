@@ -29,21 +29,21 @@ typedef struct yyltype
 
 /* Tokens */
 %start Pgm
-%token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF ELSE WHILE DO FOR RETURN CLASS
+%token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
 %token ID
 %token INT_CONSTANT UINT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
 
 /* Precedence */
+%left ','
+%right '='
 %left AND_OP OR_OP
 %nonassoc EQ_OP NE_OP LE_OP GE_OP '<' '>'
-%nonassoc '='
-%left ','
 %left '+' '-'
 %left '*' '/' '%'
 %nonassoc '!'
 %nonassoc INC_OP DEC_OP
-%left '('')'
+%left '.' '['']' '('')'
 
 %nonassoc NOELSE
 %nonassoc ELSE
@@ -66,6 +66,7 @@ Stmts : Stmt
 Stmt  : ';'
       | DeclVar ';'
       | DeclFunc
+      | DeclClass
       | Exp ';'
       | '{' Stmts '}'
       | '{'       '}'
@@ -98,8 +99,7 @@ ForNextExp :
 
 Exp  : VarAccess
      | VarAccess '=' Exp
-     | ID '(' ')'
-     | ID '(' ExpList ')'
+     | FuncCall
 
      | INT_CONSTANT
      | UINT_CONSTANT
@@ -146,6 +146,7 @@ TypeVar : INT
         | FLOAT
         | STRING
         | CHAR
+        | ID
         ;
 
 DeclVar : TypeVar InitVarList
@@ -183,13 +184,39 @@ DeclParam     : TypeVar ID
 
 
 
+/*********************/
+/* Class declaration */
+/*********************/
+
+AccessModifier : PUBLIC
+               | PRIVATE
+               ;
+
+DeclClass : CLASS ID '{' DeclClassMembers '}'
+          ;
+
+DeclClassMembers : DeclClassMember
+                 | DeclClassMember DeclClassMembers
+                 ;
+DeclClassMember  : AccessModifier DeclVar ';'
+                 | AccessModifier DeclFunc
+                 ;
+
+
+
 /*******************/
 /* Variable access */
 /*******************/
 
-VarAccess : ID
-          | ID ArrayIndexing
+VarAccess : NormalVarAccess
+          | THIS
+          | THIS '.' NormalVarAccess
           ;
+NormalVarAccess : ID
+                | ID '.' NormalVarAccess
+                | ID ArrayIndexing
+                | ID ArrayIndexing '.' NormalVarAccess
+                ;
 
 ArrayIndexing : '[' Exp ']'
               | '[' Exp ']' ArrayIndexing
@@ -197,13 +224,17 @@ ArrayIndexing : '[' Exp ']'
 
 
 
-/*********/
-/* Other */
-/*********/
+/*****************/
+/* Function call */
+/*****************/
 
-ExpList : Exp
-        | Exp ',' ExpList
-        ;
+FuncCall : VarAccess '(' FuncParamExpList ')'
+         ;
+
+FuncParamExpList :
+                 | Exp
+                 | Exp ',' FuncParamExpList
+                 ;
 
 
 
@@ -223,6 +254,7 @@ ConstIntExp : INT_CONSTANT
             | '(' ConstIntExp ')'
             ;
 
+/*
 Const  : INT_CONSTANT
        | UINT_CONSTANT
        | BOOL_CONSTANT
@@ -230,6 +262,7 @@ Const  : INT_CONSTANT
        | CHAR_CONSTANT
        | STRING_LITERAL
        ;
+*/
 
 
 

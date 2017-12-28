@@ -49,20 +49,23 @@ extern YYLTYPE yylloc;
 
 
     /* Keywords */
-"int"    {return INT;}
-"bool"   {return BOOL;}
-"double" {return DOUBLE;}
-"float"  {return FLOAT;}
-"char"   {return CHAR;}
-"string" {return STRING;}
-"void"   {return VOID;}
-"if"     {return IF;}
-"else"   {return ELSE;}
-"while"  {return WHILE;}
-"do"     {return DO;}
-"for"    {return FOR;}
-"return" {return RETURN;}
-"class"  {return CLASS;}
+"int"       {return INT;}
+"bool"      {return BOOL;}
+"double"    {return DOUBLE;}
+"float"     {return FLOAT;}
+"char"      {return CHAR;}
+"string"    {return STRING;}
+"void"      {return VOID;}
+"if"        {return IF;}
+"else"      {return ELSE;}
+"while"     {return WHILE;}
+"do"        {return DO;}
+"for"       {return FOR;}
+"return"    {return RETURN;}
+"class"     {return CLASS;}
+"this"      {return THIS;}
+"public"    {return PUBLIC;}
+"private"   {return PRIVATE;}
 
 
 
@@ -96,7 +99,6 @@ extern YYLTYPE yylloc;
 "!=" {return NE_OP;}
 "<=" {return LE_OP;}
 ">=" {return GE_OP;}
-"->" {return PTR_OP;}
 ";"  {return ';';}
 ","  {return ',';}
 ":"  {return ':';}

@@ -33,6 +33,32 @@ void out(int x)
     print(x);
 }
 
+f;
+f();
+x.f;
+x.f();
+
+class MyClass
+{
+    private double avg;
+    public int x, y;
+
+    public double getAvg()
+    {
+        this.update();
+        return avg;
+    }
+    private void update()
+    {
+        this.avg = (this.x + this.y) / 2;
+    }
+}
+
+MyClass c;
+c.x = 1;
+c.y = 2;
+print(c.getAvg());
+
 
 
 // This is a comment
