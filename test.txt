@@ -22,7 +22,7 @@ do {x++;} while(x < 1);
 do  y++;  while(y < 13);
 
 for(; x <= y; ++x)
-    m = m + x;
+    m += x;
 
 int sum(int x, int y)
 {

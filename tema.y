@@ -37,7 +37,7 @@ extern int scope_level;
 
 /* Precedence */
 %left ','
-%right '='
+%right '=' ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN
 %left AND_OP OR_OP
 %nonassoc EQ_OP NE_OP LE_OP GE_OP '<' '>'
 %left '+' '-'
@@ -114,6 +114,12 @@ Exp  : VarAccess
      | DEC_OP VarAccess
      | VarAccess INC_OP
      | VarAccess DEC_OP
+
+     | VarAccess ADD_ASSIGN Exp
+     | VarAccess SUB_ASSIGN Exp
+     | VarAccess MUL_ASSIGN Exp
+     | VarAccess DIV_ASSIGN Exp
+     | VarAccess MOD_ASSIGN Exp
 
      | Exp '+' Exp
      | Exp '-' Exp
