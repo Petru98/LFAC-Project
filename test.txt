@@ -18,6 +18,9 @@ while(x > 0)
     --x;
 }
 
+do {x++;} while(x < 1);
+do  y++;  while(y < 13);
+
 for(; x <= y; ++x)
     m = m + x;
 
