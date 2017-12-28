@@ -65,6 +65,7 @@ Stmts : Stmt
       ;
 Stmt  : ';'
       | DeclVar ';'
+      | DeclFunc
       | Exp ';'
       | '{' Stmts '}'
       | '{'       '}'
@@ -97,7 +98,8 @@ ForNextExp :
 
 Exp  : VarAccess
      | VarAccess '=' Exp
-     | ID '('  ')'
+     | ID '(' ')'
+     | ID '(' ExpList ')'
 
      | INT_CONSTANT
      | UINT_CONSTANT
@@ -163,6 +165,24 @@ ArrayDeclSize : '[' ConstIntExp ']'
 
 
 
+/************************/
+/* Function declaration */
+/************************/
+
+DeclFunc : TypeVar ID '(' DeclParamList ')' '{' Stmts '}'
+         | VOID    ID '(' DeclParamList ')' '{' Stmts '}'
+         | TypeVar ID '('               ')' '{' Stmts '}'
+         | VOID    ID '('               ')' '{' Stmts '}'
+         ;
+
+DeclParamList : DeclParam
+              | DeclParam ',' DeclParamList
+              ;
+DeclParam     : TypeVar ID
+              ;
+
+
+
 /*******************/
 /* Variable access */
 /*******************/
@@ -174,6 +194,16 @@ VarAccess : ID
 ArrayIndexing : '[' Exp ']'
               | '[' Exp ']' ArrayIndexing
               ;
+
+
+
+/*********/
+/* Other */
+/*********/
+
+ExpList : Exp
+        | Exp ',' ExpList
+        ;
 
 
 

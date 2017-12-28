@@ -24,6 +24,15 @@ do  y++;  while(y < 13);
 for(; x <= y; ++x)
     m = m + x;
 
+int sum(int x, int y)
+{
+    return x + y;
+}
+void out(int x)
+{
+    print(x);
+}
+
 
 
 // This is a comment
