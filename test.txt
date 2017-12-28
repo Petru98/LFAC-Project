@@ -12,8 +12,11 @@ if(x > y)
     }
     else
         x = 12;
-else
-    y = 23;
+
+while(x > 0)
+{
+    --x;
+}
 
 
 
@@ -21,7 +24,7 @@ else
 
 /*Multi-line
 * / comment
+the next comment is empty
 */ /**/ /*/this comment is
 not
 closed
-a

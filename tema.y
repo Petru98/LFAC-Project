@@ -71,6 +71,8 @@ Stmt  : ';'
 
       | IF '(' Exp ')' Stmt           %prec NOELSE
       | IF '(' Exp ')' Stmt ELSE Stmt
+
+      | WHILE '(' Exp ')' Stmt
       ;
 
 
