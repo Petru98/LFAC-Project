@@ -29,7 +29,7 @@ typedef struct yyltype
 
 /* Tokens */
 %start Pgm
-%token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF WHILE FOR CLASS
+%token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF ELSE WHILE FOR CLASS
 %token ID
 %token INT_CONSTANT UINT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
@@ -44,6 +44,9 @@ typedef struct yyltype
 %nonassoc '!'
 %nonassoc INC_OP DEC_OP
 %left '('')'
+
+%nonassoc NOELSE
+%nonassoc ELSE
 
 
 
@@ -63,8 +66,11 @@ Stmts : Stmt
 Stmt  : ';'
       | DeclVar ';'
       | Exp ';'
-      | '{' Stmt '}'
-      | '{'      '}'
+      | '{' Stmts '}'
+      | '{'       '}'
+
+      | IF '(' Exp ')' Stmt           %prec NOELSE
+      | IF '(' Exp ')' Stmt ELSE Stmt
       ;
 
 

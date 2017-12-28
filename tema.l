@@ -57,6 +57,7 @@ extern YYLTYPE yylloc;
 "string" {return STRING;}
 "void"   {return VOID;}
 "if"     {return IF;}
+"else"   {return ELSE;}
 "while"  {return WHILE;}
 "for"    {return FOR;}
 "class"  {return CLASS;}

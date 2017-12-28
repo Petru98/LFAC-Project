@@ -4,6 +4,17 @@ double m = 0.0;
 
 b[6 * 2 - 4] = 2 + y;
 
+if(x > y)
+    if(x < 23)
+    {
+        x = 11;
+        m = x + y / 2.0;
+    }
+    else
+        x = 12;
+else
+    y = 23;
+
 
 
 // This is a comment
