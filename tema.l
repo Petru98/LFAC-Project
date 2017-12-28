@@ -61,6 +61,7 @@ extern YYLTYPE yylloc;
 "while"  {return WHILE;}
 "do"     {return DO;}
 "for"    {return FOR;}
+"return" {return RETURN;}
 "class"  {return CLASS;}
 
 
