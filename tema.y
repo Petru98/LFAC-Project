@@ -108,6 +108,18 @@ Exp  : VarAccess
 
 
 
+/************************/
+/* Variable declaration */
+/************************/
+
+TypeVar : INT
+        | BOOL
+        | DOUBLE
+        | FLOAT
+        | STRING
+        | CHAR
+        ;
+
 DeclVar : TypeVar InitVarList
         ;
 
@@ -125,6 +137,10 @@ ArrayDeclSize : '[' ConstIntExp ']'
 
 
 
+/*******************/
+/* Variable access */
+/*******************/
+
 VarAccess : ID
           | ID ArrayIndexing
           ;
@@ -135,26 +151,21 @@ ArrayIndexing : '[' Exp ']'
 
 
 
-TypeVar : INT
-        | BOOL
-        | DOUBLE
-        | FLOAT
-        | STRING
-        | CHAR
-
-
+/*************/
+/* Constants */
+/*************/
 
 ConstIntExp : INT_CONSTANT
 
-             | ConstIntExp '+' ConstIntExp
-             | ConstIntExp '-' ConstIntExp
-             | ConstIntExp '*' ConstIntExp
-             | ConstIntExp '/' ConstIntExp
-             | ConstIntExp '%' ConstIntExp
+            | ConstIntExp '+' ConstIntExp
+            | ConstIntExp '-' ConstIntExp
+            | ConstIntExp '*' ConstIntExp
+            | ConstIntExp '/' ConstIntExp
+            | ConstIntExp '%' ConstIntExp
 
-             | '-' ConstIntExp     %prec ','
-             | '(' ConstIntExp ')'
-             ;
+            | '-' ConstIntExp     %prec ','
+            | '(' ConstIntExp ')'
+            ;
 
 Const  : INT_CONSTANT
        | UINT_CONSTANT
