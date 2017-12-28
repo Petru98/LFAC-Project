@@ -64,7 +64,8 @@ extern YYLTYPE yylloc;
 
 
     /* Constants */
-(0|[1-9][0-9]*)       {return INT_CONSTANT;}
+(0|[-+]?[1-9][0-9]*)  {return INT_CONSTANT;}
+(0|[1-9][0-9]*)(u|U)  {return UINT_CONSTANT;}
 ("false"|"true")      {return BOOL_CONSTANT;}
 ([0-9]?\.[0-9]+)      {return DOUBLE_CONSTANT;}
 ([0-9]?\.[0-9]+)(f|F) {return FLOAT_CONSTANT;}

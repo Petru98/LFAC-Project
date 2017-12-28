@@ -31,7 +31,7 @@ typedef struct yyltype
 %start Pgm
 %token INT BOOL DOUBLE FLOAT CHAR STRING VOID IF WHILE FOR CLASS
 %token ID
-%token INT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
+%token INT_CONSTANT UINT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP PTR_OP
 
 /* Precedence */
@@ -69,20 +69,21 @@ Stmt  : ';'
 
 
 
-Exp  : ID
-     | ID '=' Exp
+Exp  : VarAccess
+     | VarAccess '=' Exp
      | ID '('  ')'
 
      | INT_CONSTANT
+     | UINT_CONSTANT
      | BOOL_CONSTANT
      | FLOAT_CONSTANT
      | DOUBLE_CONSTANT
      | CHAR_CONSTANT
 
-     | INC_OP ID
-     | DEC_OP ID
-     | ID INC_OP
-     | ID DEC_OP
+     | INC_OP VarAccess
+     | DEC_OP VarAccess
+     | VarAccess INC_OP
+     | VarAccess DEC_OP
 
      | Exp '+' Exp
      | Exp '-' Exp
@@ -110,6 +111,30 @@ Exp  : ID
 DeclVar : TypeVar InitVarList
         ;
 
+InitVarList : InitVar
+            | InitVar ',' InitVarList
+            ;
+InitVar     : ID
+            | ID '=' Exp
+            | ID ArrayDeclSize
+            ;
+
+ArrayDeclSize : '[' ConstIntExp ']'
+              | '[' ConstIntExp ']' ArrayDeclSize
+              ;
+
+
+
+VarAccess : ID
+          | ID ArrayIndexing
+          ;
+
+ArrayIndexing : '[' Exp ']'
+              | '[' Exp ']' ArrayIndexing
+              ;
+
+
+
 TypeVar : INT
         | BOOL
         | DOUBLE
@@ -117,33 +142,22 @@ TypeVar : INT
         | STRING
         | CHAR
 
-InitVarList : InitVar
-            | InitVar ',' InitVarList
-            ;
-InitVar     : ID
-            | ID '=' Exp
-            | ID ArrayIndexing
-            ;
-
-ArrayIndexing : '[' ConstAExp ']'
-              | '[' ConstAExp ']' ArrayIndexing
-              ;
-
-ConstAExp : INT_CONSTANT
-
-          | ConstAExp '+' ConstAExp
-          | ConstAExp '-' ConstAExp
-          | ConstAExp '*' ConstAExp
-          | ConstAExp '/' ConstAExp
-          | ConstAExp '%' ConstAExp
-          | '-' ConstAExp           %prec ','
-
-          | '(' ConstAExp ')'
-          ;
 
 
+ConstIntExp : INT_CONSTANT
+
+             | ConstIntExp '+' ConstIntExp
+             | ConstIntExp '-' ConstIntExp
+             | ConstIntExp '*' ConstIntExp
+             | ConstIntExp '/' ConstIntExp
+             | ConstIntExp '%' ConstIntExp
+
+             | '-' ConstIntExp     %prec ','
+             | '(' ConstIntExp ')'
+             ;
 
 Const  : INT_CONSTANT
+       | UINT_CONSTANT
        | BOOL_CONSTANT
        | FLOAT_CONSTANT
        | CHAR_CONSTANT
