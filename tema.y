@@ -73,7 +73,22 @@ Stmt  : ';'
       | IF '(' Exp ')' Stmt ELSE Stmt
 
       | WHILE '(' Exp ')' Stmt
+
+      | FOR '(' ForInitExp ';' ForCondExp ';' ForNextExp ')' Stmt
       ;
+
+
+
+ForInitExp :
+           | Exp
+           | DeclVar
+           ;
+ForCondExp :
+           | Exp
+           ;
+ForNextExp :
+           | Exp
+           ;
 
 
 

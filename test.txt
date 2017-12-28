@@ -18,6 +18,9 @@ while(x > 0)
     --x;
 }
 
+for(; x <= y; ++x)
+    m = m + x;
+
 
 
 // This is a comment
