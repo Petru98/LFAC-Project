@@ -1,5 +1,7 @@
-int x = 0, y = 0;
-int a[100][100][100][100], b[100];
+int x = 0;
+int y = 0;
+int a[100][100][100][100];
+int b[100];
 double m = 0.0;
 
 b[6 * 2 - 4] = 2 + y;
@@ -29,7 +31,7 @@ int sum(int x, int y)
     int a;
     {
         {
-            float b;
+            double b;
         }
         string c;
     }
@@ -48,7 +50,8 @@ x.f();
 class MyClass
 {
     private double avg;
-    public int x, y;
+    public int x;
+    public int y;
 
     public double getAvg()
     {

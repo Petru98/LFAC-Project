@@ -6,14 +6,16 @@ CC   := gcc
 LEX  := flex
 YACC := bison
 
-CCFLAGS   := -O3
+CCFLAGS   := -ggdb
 LEXFLAGS  :=
-YACCFLAGS := --yacc
+YACCFLAGS :=
 
 SRCLEX  := $(NAME).l
 SRCYACC := $(NAME).y
 OUTLEX  := lex.yy.c
 OUTYACC := y.tab.c
+SRCS    := util.c
+HEADERS := $(SRCS:.c=.h)
 
 
 
@@ -22,13 +24,13 @@ OUTYACC := y.tab.c
 ################################################################
 all: $(NAME)
 
-$(NAME): $(OUTLEX) $(OUTYACC)
+$(NAME): $(OUTLEX) $(OUTYACC) $(SRCS)
 	$(CC) -o $@ $(CCFLAGS) $^ -ll -ly
 
-$(OUTLEX): $(SRCLEX)
+$(OUTLEX): $(SRCLEX) $(HEADERS)
 	$(LEX) -o $@ $(LEXFLAGS) $(SRCLEX)
 
-$(OUTYACC): $(SRCYACC) String.h
+$(OUTYACC): $(SRCYACC) $(HEADERS)
 	$(YACC) -o $@ $(YACCFLAGS) $(SRCYACC)
 
 
@@ -39,7 +41,7 @@ clean:
 
 
 test: all
-	@./$(NAME) < test.txt
+	@./$(NAME) test.txt
 
 
 

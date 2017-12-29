@@ -3,10 +3,16 @@
 /******************************************************************************/
 
 /* C code */
+%code requires
+{
+#include "util.h"
+}
+
 %{
 #include <stdio.h>
 #include <stdint.h>
-#include "String.h"
+#include <signal.h>
+#include "util.h"
 
 void yyerror(const char* msg);
 void yywarning(const char* msg);
@@ -21,18 +27,44 @@ typedef struct yyltype
     size_t last_column;
 } yyltype;
 
+extern FILE* yyin;
 extern int scope_level;
+
+
+
+VariableList varlist = {0};
+FunctionList funclist = {0};
+
+void declareVariable(const char* name, int type, bool constant, void* data);
 %}
 
 /* Flags for yacc */
 %defines
 %locations
+%yacc
+
+%union
+{
+    long intval;
+    bool boolval;
+    double doubleval;
+    char charval;
+    char* strval;
+    char* idval;
+}
 
 /* Tokens */
 %start Pgm
-%token INT BOOL DOUBLE FLOAT CHAR STRING VOID CONST PRINT IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
-%token ID
-%token INT_CONSTANT UINT_CONSTANT BOOL_CONSTANT DOUBLE_CONSTANT FLOAT_CONSTANT CHAR_CONSTANT STRING_LITERAL
+%token <intval> INT BOOL DOUBLE CHAR STRING VOID
+%token CONST PRINT IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
+
+%token <idval> ID
+%token <intval> INT_CONSTANT
+%token <boolval> BOOL_CONSTANT
+%token <doubleval> DOUBLE_CONSTANT
+%token <charval> CHAR_CONSTANT
+%token <strval> STRING_LITERAL
+
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP
 
 /* Precedence */
@@ -62,8 +94,9 @@ Pgm :
 
 
 Stmts : Stmt
-      | Stmt Stmts
+      | Stmts Stmt
       ;
+
 Stmt  : ';'
       | DeclVar ';'
       | DeclFunc
@@ -104,9 +137,7 @@ Exp  : VarAccess
      | FuncCall
 
      | INT_CONSTANT
-     | UINT_CONSTANT
      | BOOL_CONSTANT
-     | FLOAT_CONSTANT
      | DOUBLE_CONSTANT
      | CHAR_CONSTANT
 
@@ -144,36 +175,30 @@ Exp  : VarAccess
 
 
 
+TypePredef : INT
+           | BOOL
+           | DOUBLE
+           | CHAR
+           | STRING
+           ;
+
+
+
 /************************/
 /* Variable declaration */
 /************************/
 
-TypeVar : INT
-        | BOOL
-        | DOUBLE
-        | FLOAT
-        | STRING
-        | CHAR
-        | ID
-        ;
 
-DeclVar : TypeVar InitVarList
-        | CONST TypeVar InitConstVarList
-        ;
+DeclVar       : TypePredef ID               {void* val = 0; declareVariable($2, $<intval>1, false, &val); free($2);}
+              | TypePredef ID ArrayDeclSize {void* val = 0; declareVariable($2, $<intval>1, false, &val); free($2);}
+              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, &$<strval>4); free($2);}
 
-InitVarList : InitVar
-            | InitVar ',' InitVarList
-            ;
-InitVar     : ID
-            | ID '=' Exp
-            | ID ArrayDeclSize
-            ;
+              | ID ID               {declareVariable($2, CLASS, false, &$1); free($1); free($2);}
+              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, &$1); free($1); free($2);}
+              | ID ID '=' Exp       {declareVariable($2, CLASS, false, &$<strval>4); free($1); free($2);}
 
-InitConstVarList : InitConstVar
-                 | InitConstVar ',' InitConstVarList
-                 ;
-InitConstVar     : ID '=' Exp
-                 ;
+              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, &$<strval>5); free($3);}
+              ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
               | '[' ConstIntExp ']' ArrayDeclSize
@@ -185,17 +210,22 @@ ArrayDeclSize : '[' ConstIntExp ']'
 /* Function declaration */
 /************************/
 
-DeclFunc : TypeVar ID '(' DeclParamList ')' '{' Stmts '}'
-         | VOID    ID '(' DeclParamList ')' '{' Stmts '}'
-         | TypeVar ID '('               ')' '{' Stmts '}'
-         | VOID    ID '('               ')' '{' Stmts '}'
-         ;
+DeclFunc              : TypePredef ID '(' DeclParamList ')' '{' Stmts '}' {free($2);}
+                      | ID         ID '(' DeclParamList ')' '{' Stmts '}' {free($1); free($2);}
+                      | VOID       ID '(' DeclParamList ')' '{' Stmts '}' {free($2);}
+                      ;
 
-DeclParamList : DeclParam
-              | DeclParam ',' DeclParamList
-              ;
-DeclParam     : TypeVar ID
-              ;
+DeclParamList         :
+                      | DeclParamListNonEmpty
+                      ;
+
+DeclParamListNonEmpty : DeclParam
+                      | DeclParamListNonEmpty ',' DeclParam
+                      ;
+
+DeclParam             : TypePredef ID {free($2);}
+                      | ID ID         {free($1); free($2);}
+                      ;
 
 
 
@@ -203,16 +233,17 @@ DeclParam     : TypeVar ID
 /* Class declaration */
 /*********************/
 
-AccessModifier : PUBLIC
-               | PRIVATE
-               ;
+AccessModifier   : PUBLIC
+                 | PRIVATE
+                 ;
 
-DeclClass : CLASS ID '{' DeclClassMembers '}'
-          ;
+DeclClass        : CLASS ID '{' DeclClassMembers '}' {free($2);}
+                 ;
 
 DeclClassMembers : DeclClassMember
-                 | DeclClassMember DeclClassMembers
+                 | DeclClassMembers DeclClassMember
                  ;
+
 DeclClassMember  : AccessModifier DeclVar ';'
                  | AccessModifier DeclFunc
                  ;
@@ -223,19 +254,20 @@ DeclClassMember  : AccessModifier DeclVar ';'
 /* Variable access */
 /*******************/
 
-VarAccess : NormalVarAccess
-          | THIS
-          | THIS '.' NormalVarAccess
-          ;
-NormalVarAccess : ID
-                | ID '.' NormalVarAccess
-                | ID ArrayIndexing
-                | ID ArrayIndexing '.' NormalVarAccess
+VarAccess       : NormalVarAccess
+                | THIS
+                | THIS '.' NormalVarAccess
                 ;
 
-ArrayIndexing : '[' Exp ']'
-              | '[' Exp ']' ArrayIndexing
-              ;
+NormalVarAccess : ID                                   {free($1);}
+                | ID '.' NormalVarAccess               {free($1);}
+                | ID ArrayIndexing                     {free($1);}
+                | ID ArrayIndexing '.' NormalVarAccess {free($1);}
+                ;
+
+ArrayIndexing   : '[' Exp ']'
+                | '[' Exp ']' ArrayIndexing
+                ;
 
 
 
@@ -243,12 +275,12 @@ ArrayIndexing : '[' Exp ']'
 /* Function call */
 /*****************/
 
-FuncCall : VarAccess '(' FuncParamExpList ')'
-         ;
+FuncCall         : VarAccess '(' FuncParamExpList ')'
+                 ;
 
 FuncParamExpList :
                  | Exp
-                 | Exp ',' FuncParamExpList
+                 | FuncParamExpList ',' Exp
                  ;
 
 
@@ -269,24 +301,51 @@ ConstIntExp : INT_CONSTANT
             | '(' ConstIntExp ')'
             ;
 
-/*
-Const  : INT_CONSTANT
-       | UINT_CONSTANT
-       | BOOL_CONSTANT
-       | FLOAT_CONSTANT
-       | CHAR_CONSTANT
-       | STRING_LITERAL
-       ;
-*/
-
 
 
 %%
 /******************************************************************************/
 /*********************************** C code ***********************************/
 /******************************************************************************/
+void handleSIGSEGV(int s)
+{
+    yyerror("SIGSEGV caught... aborting");
+    abort();
+}
+
 int main(int argc, char** argv)
 {
+    signal(SIGSEGV, handleSIGSEGV);
+
+    if(argc >= 2)
+    {
+        FILE* fp = fopen(argv[1], "r");
+        if(fp == NULL)
+        {
+            fprintf(stderr, "could not open file %s\n", argv[1]);
+            return 1;
+        }
+
+        if((yyin != NULL && fclose(yyin) != 0) || fclose(stdin) != 0)
+        {
+            fprintf(stderr, "fclose failed\n");
+            return 1;
+        }
+
+        yyin = fp;
+        stdin = yyin;
+    }
+
     yyparse();
     return 0;
+}
+
+void declareVariable(const char* name, int type, bool constant, void* data)
+{
+    const int error = VariableList_insert(&varlist, name, strlen(name), type, scope_level, constant, data);
+
+    if(error == 1)
+        yyerror("variable is already declared");
+    else if(error == -1)
+        yyerror("not enough memory to declare variable");
 }

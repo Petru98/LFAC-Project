@@ -4,7 +4,11 @@
 
 /* C code */
 %{
+#include "util.h"
 #include "y.tab.h"
+#include <errno.h>
+#include <limits.h>
+#include <math.h>
 
 void yyerror(const char* msg);
 void yywarning(const char* msg);
@@ -50,13 +54,12 @@ extern YYLTYPE yylloc;
 
 
     /* Keywords */
-"int"       {return INT;}
-"bool"      {return BOOL;}
-"double"    {return DOUBLE;}
-"float"     {return FLOAT;}
-"char"      {return CHAR;}
-"string"    {return STRING;}
-"void"      {return VOID;}
+"int"       {yylval.intval = INT; return INT;}
+"bool"      {yylval.intval = BOOL; return BOOL;}
+"double"    {yylval.intval = DOUBLE; return DOUBLE;}
+"char"      {yylval.intval = CHAR; return CHAR;}
+"string"    {yylval.intval = STRING; return STRING;}
+"void"      {yylval.intval = VOID; return VOID;}
 "const"     {return CONST;}
 "print"     {return PRINT;}
 "if"        {return IF;}
@@ -73,18 +76,48 @@ extern YYLTYPE yylloc;
 
 
     /* Constants */
-(0|[-+]?[1-9][0-9]*)  {return INT_CONSTANT;}
-(0|[1-9][0-9]*)(u|U)  {return UINT_CONSTANT;}
-("false"|"true")      {return BOOL_CONSTANT;}
-([0-9]?\.[0-9]+)      {return DOUBLE_CONSTANT;}
-([0-9]?\.[0-9]+)(f|F) {return FLOAT_CONSTANT;}
-\'(.)\'               {return CHAR_CONSTANT;}
-\"([^"\n]|\\\")*\"    {return STRING_LITERAL;}
+(0|[-+]?[1-9][0-9]*) {
+    yylval.intval = strtol(yytext, NULL, 10);
+    if((yylval.intval == LONG_MAX || yylval.intval == LONG_MIN) && errno == ERANGE)
+        yyerror("integer constant is out of the range of representable values");
+    return INT_CONSTANT;
+}
+
+("false"|"true") {
+    yylval.boolval = ((*yytext) == 't');
+    return BOOL_CONSTANT;
+}
+
+([0-9]?\.[0-9]+) {
+    yylval.doubleval = strtod(yytext, NULL);
+    if((yylval.doubleval == HUGE_VAL || yylval.doubleval == -HUGE_VAL) && errno == ERANGE)
+        yyerror("double constant is out of the range of representable values");
+    return DOUBLE_CONSTANT;
+}
+
+\'(.)\' {
+    yylval.charval = yytext[1];
+    return CHAR_CONSTANT;
+}
+
+\"([^"\n]|\\\")*\" {
+    yylval.strval = malloc(yyleng - 2 + 1);
+    if(yylval.strval == NULL)
+        yyerror("not enough memory for strval");
+    else
+        strncpy(yylval.strval, yytext + 1, yyleng - 2);
+    return STRING_LITERAL;
+}
 
 
 
     /* Id */
-[_a-zA-Z][_a-zA-Z0-9]* {return ID;}
+[_a-zA-Z][_a-zA-Z0-9]* {
+    yylval.idval = strdup(yytext);
+    if(yylval.idval == NULL)
+        yyerror("not enough memory for idval");
+    return ID;
+}
 
 
 
