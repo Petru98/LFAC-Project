@@ -12,20 +12,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <signal.h>
+#include "yylloc.h"
 #include "util.h"
 
-void yyerror(const char* msg);
-void yywarning(const char* msg);
+void yyerror(const char* msg, ...);
+void yywarning(const char* msg, ...);
 int yylex();
-
-#define YYLTYPE yyltype
-typedef struct yyltype
-{
-    size_t first_line;
-    size_t first_column;
-    size_t last_line;
-    size_t last_column;
-} yyltype;
 
 extern FILE* yyin;
 extern int scope_level;
@@ -35,13 +27,14 @@ extern int scope_level;
 VariableList varlist = {0};
 FunctionList funclist = {0};
 
-void declareVariable(const char* name, int type, bool constant, void* data);
+void declareVariable(const char* name, int type, bool constant, void* data, const YYLTYPE* yylloc);
 %}
 
 /* Flags for yacc */
 %defines
 %locations
 %yacc
+// %no-lines // Uncomment to be able to add breakpoints in y.tab.c
 
 %union
 {
@@ -189,15 +182,15 @@ TypePredef : INT
 /************************/
 
 
-DeclVar       : TypePredef ID               {void* val = 0; declareVariable($2, $<intval>1, false, &val); free($2);}
-              | TypePredef ID ArrayDeclSize {void* val = 0; declareVariable($2, $<intval>1, false, &val); free($2);}
-              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, &$<strval>4); free($2);}
+DeclVar       : TypePredef ID               {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2); free($2);}
+              | TypePredef ID ArrayDeclSize {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2); free($2);}
+              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, &$<strval>4, &@2); free($2);}
 
-              | ID ID               {declareVariable($2, CLASS, false, &$1); free($1); free($2);}
-              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, &$1); free($1); free($2);}
-              | ID ID '=' Exp       {declareVariable($2, CLASS, false, &$<strval>4); free($1); free($2);}
+              | ID ID               {declareVariable($2, CLASS, false, &$1, &@2); free($1); free($2);}
+              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, &$1, &@2); free($1); free($2);}
+              | ID ID '=' Exp       {declareVariable($2, CLASS, false, &$<strval>4, &@2); free($1); free($2);}
 
-              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, &$<strval>5); free($3);}
+              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, &$<strval>5, &@3); free($3);}
               ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
@@ -340,12 +333,20 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void declareVariable(const char* name, int type, bool constant, void* data)
+void declareVariable(const char* name, int type, bool constant, void* data, const YYLTYPE* yylloc)
 {
-    const int error = VariableList_insert(&varlist, name, strlen(name), type, scope_level, constant, data);
+    int insert_position;
+    const int current_position = VariableList_find(&varlist, name, &insert_position);
 
-    if(error == 1)
-        yyerror("variable is already declared");
-    else if(error == -1)
-        yyerror("not enough memory to declare variable");
+    if(current_position >= 0)
+        yyerror("variable %s is already declared at (%zu,%zu)", name, varlist.elements[current_position]->decl_line, varlist.elements[current_position]->decl_column);
+    else
+    {
+        const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, insert_position);
+        if(error == -1)
+        {
+            yyerror("not enough memory to declare variable %s", name);
+            abort();
+        }
+    }
 }

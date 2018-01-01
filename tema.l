@@ -4,14 +4,16 @@
 
 /* C code */
 %{
-#include "util.h"
-#include "y.tab.h"
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <stdarg.h>
+#include "yylloc.h"
+#include "util.h"
+#include "y.tab.h"
 
-void yyerror(const char* msg);
-void yywarning(const char* msg);
+void yyerror(const char* msg, ...);
+void yywarning(const char* msg, ...);
 
 void skipMultilineComment();
 
@@ -174,13 +176,23 @@ extern YYLTYPE yylloc;
 /******************************************************************************/
 /*********************************** C code ***********************************/
 /******************************************************************************/
-void yyerror(const char* msg)
+void yyerror(const char* msg, ...)
 {
-    fprintf(stderr, "error: (%zu, %zu)->(%zu, %zu): %s\n", yylloc.first_line, yylloc.first_column, yylloc.last_line, yylloc.last_column, msg);
+    va_list args;
+    va_start(args, msg);
+    fprintf(stderr, "error: (%zu, %zu)->(%zu, %zu): ", yylloc.first_line, yylloc.first_column, yylloc.last_line, yylloc.last_column);
+    vfprintf(stderr, msg, args);
+    fputc('\n', stderr);
+    va_end(args);
 }
-void yywarning(const char* msg)
+void yywarning(const char* msg, ...)
 {
-    fprintf(stderr, "warning: (%zu, %zu)->(%zu, %zu): %s\n", yylloc.first_line, yylloc.first_column, yylloc.last_line, yylloc.last_column, msg);
+    va_list args;
+    va_start(args, msg);
+    fprintf(stderr, "warning: (%zu, %zu)->(%zu, %zu): ", yylloc.first_line, yylloc.first_column, yylloc.last_line, yylloc.last_column);
+    vfprintf(stderr, msg, args);
+    fputc('\n', stderr);
+    va_end(args);
 }
 
 void skipMultilineComment()

@@ -112,12 +112,12 @@ int VariableList_insertElement(VariableList* list, Variable* element, int positi
 {
     if(list->size == list->capacity)
     {
-        int new_capacity = 1 + list->capacity * sizeof(Variable*) * 2;
-        Variable** new_list = realloc(list->elements, new_capacity);
+        int new_capacity = 1 + list->capacity * 2;
+        Variable** new_list = realloc(list->elements, new_capacity * sizeof(Variable*));
         if(new_list == NULL)
         {
-            new_capacity = 1 + list->capacity * sizeof(Variable*);
-            new_list = realloc(list->elements, new_capacity);
+            new_capacity = 1 + list->capacity;
+            new_list = realloc(list->elements, new_capacity * sizeof(Variable*));
             if(new_list == NULL)
                 return -1;
         }
@@ -133,7 +133,7 @@ int VariableList_insertElement(VariableList* list, Variable* element, int positi
     return 0;
 }
 
-int VariableList_insertAt(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int position)
+int VariableList_insertAt(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position)
 {
     Variable* element = malloc(sizeof(Variable) + name_length + 1);
     if(element == NULL)
@@ -180,6 +180,8 @@ int VariableList_insertAt(VariableList* list, const char* name, int name_length,
     element->type        = type;
     element->scope_level = scope_level;
     element->constant    = constant;
+    element->decl_line   = decl_line;
+    element->decl_column = decl_column;
 
     if(VariableList_insertElement(list, element, position) != 0)
     {
@@ -191,17 +193,13 @@ int VariableList_insertAt(VariableList* list, const char* name, int name_length,
     return 0;
 }
 
-int VariableList_insert(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data)
+int VariableList_insert(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column)
 {
-    int position;
-    if(yylloc.first_line == 53)
-    {
-        int x = 0;
-    }
-    if(VariableList_find(list, name, &position) != -1)
+    int insert_position;
+    if(VariableList_find(list, name, &insert_position) != -1)
         return 1;
 
-    return VariableList_insertAt(list, name, name_length, type, scope_level, constant, data, position);
+    return VariableList_insertAt(list, name, name_length, type, scope_level, constant, data, decl_line, decl_column, insert_position);
 }
 
 

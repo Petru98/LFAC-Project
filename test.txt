@@ -4,6 +4,27 @@ int a[100][100][100][100];
 int b[100];
 double m = 0.0;
 
+int sum(int x, int y)
+{
+    int a;
+    {
+        {
+            double b;
+        }
+        string c;
+    }
+    return x + y;
+}
+void out(int x)
+{
+    print(x);
+}
+
+f;
+f();
+x.f;
+x.f();
+
 b[6 * 2 - 4] = 2 + y;
 
 if(x > y)
@@ -25,27 +46,6 @@ do  y++;  while(y < 13);
 
 for(; x <= y; ++x)
     m += x;
-
-int sum(int x, int y)
-{
-    int a;
-    {
-        {
-            double b;
-        }
-        string c;
-    }
-    return x + y;
-}
-void out(int x)
-{
-    print(x);
-}
-
-f;
-f();
-x.f;
-x.f();
 
 class MyClass
 {
