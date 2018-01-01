@@ -25,6 +25,8 @@ extern int scope_level;
 
 
 VariableList varlist = {0};
+VariableListStack varliststack = {0};
+
 FunctionList funclist = {0};
 
 void declareVariable(const char* name, int type, bool constant, void* data, const YYLTYPE* yylloc);
@@ -339,14 +341,18 @@ void declareVariable(const char* name, int type, bool constant, void* data, cons
     const int current_position = VariableList_find(&varlist, name, &insert_position);
 
     if(current_position >= 0)
-        yyerror("variable %s is already declared at (%zu,%zu)", name, varlist.elements[current_position]->decl_line, varlist.elements[current_position]->decl_column);
-    else
     {
-        const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, insert_position);
-        if(error == -1)
+        //if(varlist.elements[current_position]->scope_level == scope_level)
         {
-            yyerror("not enough memory to declare variable %s", name);
-            abort();
+            yyerror("variable %s is already declared at (%zu,%zu)", name, varlist.elements[current_position]->decl_line, varlist.elements[current_position]->decl_column);
+            return;
         }
+    }
+
+    const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, insert_position);
+    if(error == -1)
+    {
+        yyerror("not enough memory to declare variable %s", name);
+        abort();
     }
 }

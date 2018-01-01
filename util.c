@@ -78,10 +78,20 @@ void VariableList_destroy(VariableList* list)
     }
 
     free(list->elements);
-
-    list->size = 0;
-    list->capacity = 0;
     list->elements = NULL;
+    list->capacity = 0;
+    list->size = 0;
+}
+
+int VariableList_copy(const VariableList* src, VariableList* dst)
+{
+    dst->elements = memdup(src->elements, src->capacity * sizeof(Variable*));
+    if(dst->elements == NULL)
+        return -1;
+
+    dst->capacity = src->capacity;
+    dst->size = src->size;
+    return 0;
 }
 
 int VariableList_find(VariableList* list, const char* name, int* insert_pos)
@@ -200,6 +210,51 @@ int VariableList_insert(VariableList* list, const char* name, int name_length, i
         return 1;
 
     return VariableList_insertAt(list, name, name_length, type, scope_level, constant, data, decl_line, decl_column, insert_position);
+}
+
+
+
+void VariableListStack_destroy(VariableListStack* stack)
+{
+    for(int i = 0; i < stack->size; ++i)
+        VariableList_destroy(&stack->elements[i]);
+
+    free(stack->elements);
+    stack->elements = NULL;
+    stack->capacity = 0;
+    stack->size = 0;
+}
+
+int VariableListStack_push(VariableListStack* stack, const VariableList* list)
+{
+    if(stack->size == stack->capacity)
+    {
+        int new_capacity = 1 + stack->capacity * 2;
+        VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(VariableList*));
+        if(new_stack == NULL)
+        {
+            int new_capacity = 1 + stack->capacity;
+            VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(VariableList*));
+            if(new_stack == NULL)
+                return -1;
+        }
+
+        stack->elements = new_stack;
+        stack->capacity = new_capacity;
+    }
+
+    VariableList_copy(list, &stack->elements[stack->size]);
+    ++stack->size;
+    return 0;
+}
+
+int VariableListStack_pop(VariableListStack* stack, VariableList* list)
+{
+    if(stack->size == 0)
+        return -1;
+
+    --stack->size;
+    return 0;
 }
 
 

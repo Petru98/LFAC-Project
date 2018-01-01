@@ -54,10 +54,24 @@ typedef struct VariableList
 } VariableList;
 
 void VariableList_destroy(VariableList* list);
+int  VariableList_copy(const VariableList* src, VariableList* dst);
 int  VariableList_find(VariableList* list, const char* name, int* insert_pos);
 int  VariableList_insertElement(VariableList* list, Variable* element, int position);
 int  VariableList_insertAt(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position);
 int  VariableList_insert(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column);
+
+
+
+typedef struct VariableListStack
+{
+    VariableList* elements;
+    int size;
+    int capacity;
+}VariableListStack;
+
+void VariableListStack_destroy(VariableListStack* stack);
+int  VariableListStack_push(VariableListStack* stack, const VariableList* list);
+int  VariableListStack_pop(VariableListStack* stack, VariableList* list);
 
 
 
