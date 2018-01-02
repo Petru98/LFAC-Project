@@ -28,12 +28,13 @@ VariableListStack varliststack = {0};
 
 FunctionList funclist = {0};
 
-void declareVariable(char* name, int type, bool constant, void* data, const YYLTYPE* yylloc);
+void declareVariable(char* name, int type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc);
 void declareFunction(char* name, const Type* return_type, TypeList* typelist);
 void enterBlock();
 void exitBlock();
 
 void checkIfVariableIsDeclared(const char* name);
+void checkIfVariableIsInitialized(const char* name);
 %}
 
 /* Flags for yacc */
@@ -137,8 +138,8 @@ ForNextExp :
 
 
 
-Exp  : VarAccess
-     | VarAccess '=' Exp
+Exp  : VarAccess         {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | VarAccess '=' Exp {free($<idval>1);}
      | FuncCall
 
      | INT_CONSTANT
@@ -146,16 +147,16 @@ Exp  : VarAccess
      | DOUBLE_CONSTANT
      | CHAR_CONSTANT
 
-     | INC_OP VarAccess
-     | DEC_OP VarAccess
-     | VarAccess INC_OP
-     | VarAccess DEC_OP
+     | INC_OP VarAccess {checkIfVariableIsInitialized($<idval>2); free($<idval>2);}
+     | DEC_OP VarAccess {checkIfVariableIsInitialized($<idval>2); free($<idval>2);}
+     | VarAccess INC_OP {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | VarAccess DEC_OP {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
 
-     | VarAccess ADD_ASSIGN Exp
-     | VarAccess SUB_ASSIGN Exp
-     | VarAccess MUL_ASSIGN Exp
-     | VarAccess DIV_ASSIGN Exp
-     | VarAccess MOD_ASSIGN Exp
+     | VarAccess ADD_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | VarAccess SUB_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | VarAccess MUL_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | VarAccess DIV_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | VarAccess MOD_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
 
      | Exp '+' Exp
      | Exp '-' Exp
@@ -194,15 +195,15 @@ TypePredef : INT
 /************************/
 
 
-DeclVar       : TypePredef ID               {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2);}
-              | TypePredef ID ArrayDeclSize {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2);}
-              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, &$<strval>4, &@2);}
+DeclVar       : TypePredef ID               {long double val = 0; declareVariable($2, $<intval>1, false, false, &val, &@2);}
+              | TypePredef ID ArrayDeclSize {long double val = 0; declareVariable($2, $<intval>1, false, false, &val, &@2);}
+              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, true, &$<strval>4, &@2);}
 
-              | ID ID               {declareVariable($2, CLASS, false, &$1, &@2);}
-              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, &$1, &@2);}
-              | ID ID '=' Exp       {declareVariable($2, CLASS, false, &$<strval>4, &@2);}
+              | ID ID               {declareVariable($2, CLASS, false, false, &$1, &@2);}
+              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, false, &$1, &@2);}
+              | ID ID '=' Exp       {declareVariable($2, CLASS, false, true, &$<strval>4, &@2);}
 
-              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, &$<strval>5, &@3);}
+              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, true, &$<strval>5, &@3);}
               ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
@@ -228,8 +229,8 @@ DeclParamListNonEmpty : DeclParam                           {{$<typelistval>$.el
                       | DeclParamListNonEmpty ',' DeclParam {TypeList_insert(&$<typelistval>1, &$3); $<typelistval>$ = $<typelistval>1;}
                       ;
 
-DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2);}
-                      | ID ID         {$$.type = CLASS; $$.class_name = $1; declareVariable($2, CLASS, false, &$1, &@2);}
+DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; long double val = 0; declareVariable($2, $<intval>1, false, true, &val, &@2);}
+                      | ID ID         {$$.type = CLASS; $$.class_name = $1; declareVariable($2, CLASS, false, true, &$1, &@2);}
                       ;
 
 
@@ -242,7 +243,7 @@ AccessModifier   : PUBLIC
                  | PRIVATE
                  ;
 
-DeclClass        : CLASS ID {enterBlock();} '{' DeclClassMembers '}' {exitBlock();}
+DeclClass        : CLASS ID {enterBlock(); char* s = strdup($2); declareVariable(strdup("this"), CLASS, true, true, &s, &yylloc);} '{' DeclClassMembers '}' {exitBlock();}
                  ;
 
 DeclClassMembers : DeclClassMember
@@ -259,10 +260,10 @@ DeclClassMember  : AccessModifier DeclVar ';'
 /* Variable access */
 /*******************/
 
-VarAccess       : ID                  {checkIfVariableIsDeclared($1); free($1);}
-                | ID VarAccessExtra   {checkIfVariableIsDeclared($1); free($1);}
-                | THIS
-                | THIS VarAccessExtra
+VarAccess       : ID                  {checkIfVariableIsDeclared($<idval>1);}
+                | ID VarAccessExtra   {checkIfVariableIsDeclared($<idval>1);}
+                | THIS                {checkIfVariableIsDeclared($<idval>1);}
+                | THIS VarAccessExtra {checkIfVariableIsDeclared($<idval>1);}
                 ;
 
 VarAccessExtra  : '.' ID                       {free($2);}
@@ -348,8 +349,14 @@ int main(int argc, char** argv)
 
 
 
-void declareVariable(char* name, int type, bool constant, void* data, const YYLTYPE* yylloc)
+void declareVariable(char* name, int type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc)
 {
+    if(name == NULL)
+    {
+        yyerror("not enough memory to declare variable");
+        abort();
+    }
+
     int insert_position;
     const int current_position = VariableList_find(&varlist, name, &insert_position);
 
@@ -361,7 +368,7 @@ void declareVariable(char* name, int type, bool constant, void* data, const YYLT
             return;
         }
 
-        const int error = VariableList_replace(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, current_position);
+        const int error = VariableList_replace(&varlist, name, strlen(name), type, scope_level, constant, initialized, data, yylloc->first_line, yylloc->first_column, current_position);
         if(error == -1)
         {
             yyerror("not enough memory to declare variable %s", name);
@@ -370,7 +377,7 @@ void declareVariable(char* name, int type, bool constant, void* data, const YYLT
     }
     else
     {
-        const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, insert_position);
+        const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, initialized, data, yylloc->first_line, yylloc->first_column, insert_position);
         if(error == -1)
         {
             yyerror("not enough memory to declare variable %s", name);
@@ -406,4 +413,10 @@ void checkIfVariableIsDeclared(const char* name)
     const int position = VariableList_find(&varlist, name, NULL);
     if(position == -1)
         yyerror("Variable %s is undeclared", name);
+}
+void checkIfVariableIsInitialized(const char* name)
+{
+    const int position = VariableList_find(&varlist, name, NULL);
+    if(position >= 0 && varlist.elements[position].initialized == false)
+        yywarning("Variable %s was not explicitly initialized", name);
 }

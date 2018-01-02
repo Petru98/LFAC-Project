@@ -70,7 +70,7 @@ extern YYLTYPE yylloc;
 "for"       {return FOR;}
 "return"    {return RETURN;}
 "class"     {return CLASS;}
-"this"      {return THIS;}
+"this"      {yylval.idval = strdup("this"); if(yylval.idval == NULL) {yyerror("not enough memory"); abort();} return THIS;}
 "public"    {return PUBLIC;}
 "private"   {return PRIVATE;}
 

@@ -40,6 +40,7 @@ typedef struct Variable
     int decl_line;
     int decl_column;
     bool constant;
+    bool initialized;
 
     union
     {
@@ -63,9 +64,13 @@ void VariableList_destroy(VariableList* list, int scope_level);
 int  VariableList_copy(const VariableList* src, VariableList* dst);
 int  VariableList_find(VariableList* list, const char* name, int* insert_pos);
 int  VariableList_insertElement(VariableList* list, Variable* element, int position);
-int  VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position);
-int  VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column);
-int  VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position);
+
+int  VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+                           void* data, int decl_line, int decl_column, int position);
+int  VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+                         void* data, int decl_line, int decl_column);
+int  VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+                          void* data, int decl_line, int decl_column, int position);
 
 
 

@@ -158,7 +158,8 @@ int VariableList_insertElement(VariableList* list, Variable* element, int positi
     return 0;
 }
 
-int VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position)
+int VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+                          void* data, int decl_line, int decl_column, int position)
 {
     Variable element;
 
@@ -185,6 +186,7 @@ int VariableList_insertAt(VariableList* list, char* name, int name_length, int t
     element.type        = type;
     element.scope_level = scope_level;
     element.constant    = constant;
+    element.initialized = initialized;
     element.decl_line   = decl_line;
     element.decl_column = decl_column;
 
@@ -194,16 +196,18 @@ int VariableList_insertAt(VariableList* list, char* name, int name_length, int t
     return 0;
 }
 
-int VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column)
+int VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+                        void* data, int decl_line, int decl_column)
 {
     int insert_position;
     if(VariableList_find(list, name, &insert_position) != -1)
         return 1;
 
-    return VariableList_insertAt(list, name, name_length, type, scope_level, constant, data, decl_line, decl_column, insert_position);
+    return VariableList_insertAt(list, name, name_length, type, scope_level, constant, initialized, data, decl_line, decl_column, insert_position);
 }
 
-int VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position)
+int VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+                         void* data, int decl_line, int decl_column, int position)
 {
     Variable* element = &list->elements[position];
 
@@ -230,6 +234,7 @@ int VariableList_replace(VariableList* list, char* name, int name_length, int ty
     element->type        = type;
     element->scope_level = scope_level;
     element->constant    = constant;
+    element->initialized = initialized;
     element->decl_line   = decl_line;
     element->decl_column = decl_column;
 
