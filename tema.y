@@ -5,6 +5,7 @@
 /* C code */
 %code requires
 {
+#include "yylloc.h"
 #include "util.h"
 }
 
@@ -20,23 +21,24 @@ void yywarning(const char* msg, ...);
 int yylex();
 
 extern FILE* yyin;
-extern int scope_level;
-
-
+int scope_level = 0;
 
 VariableList varlist = {0};
 VariableListStack varliststack = {0};
 
 FunctionList funclist = {0};
 
-void declareVariable(const char* name, int type, bool constant, void* data, const YYLTYPE* yylloc);
+void declareVariable(char* name, int type, bool constant, void* data, const YYLTYPE* yylloc);
+void declareFunction(char* name, const Type* return_type, TypeList* typelist);
+void enterBlock();
+void exitBlock();
 %}
 
 /* Flags for yacc */
 %defines
 %locations
 %yacc
-// %no-lines // Uncomment to be able to add breakpoints in y.tab.c
+//%no-lines // Uncomment to be able to add breakpoints in y.tab.c
 
 %union
 {
@@ -46,6 +48,8 @@ void declareVariable(const char* name, int type, bool constant, void* data, cons
     char charval;
     char* strval;
     char* idval;
+    Type typeval;
+    TypeList typelistval;
 }
 
 /* Tokens */
@@ -61,6 +65,10 @@ void declareVariable(const char* name, int type, bool constant, void* data, cons
 %token <strval> STRING_LITERAL
 
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN INC_OP DEC_OP AND_OP OR_OP EQ_OP NE_OP LE_OP GE_OP
+
+/* Types for non-terminal */
+%type <intval> TypePredef
+%type <typeval> DeclParam
 
 /* Precedence */
 %left ','
@@ -97,8 +105,8 @@ Stmt  : ';'
       | DeclFunc
       | DeclClass
       | Exp ';'
-      | '{' Stmts '}'
-      | '{'       '}'
+      | '{' {enterBlock();} Stmts '}' {exitBlock();}
+      | '{''}'
 
       | PRINT '(' Exp ')' ';'
       | RETURN Exp ';'
@@ -184,15 +192,15 @@ TypePredef : INT
 /************************/
 
 
-DeclVar       : TypePredef ID               {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2); free($2);}
-              | TypePredef ID ArrayDeclSize {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2); free($2);}
-              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, &$<strval>4, &@2); free($2);}
+DeclVar       : TypePredef ID               {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2);}
+              | TypePredef ID ArrayDeclSize {long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2);}
+              | TypePredef ID '=' Exp       {declareVariable($2, $<intval>1, false, &$<strval>4, &@2);}
 
-              | ID ID               {declareVariable($2, CLASS, false, &$1, &@2); free($1); free($2);}
-              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, &$1, &@2); free($1); free($2);}
-              | ID ID '=' Exp       {declareVariable($2, CLASS, false, &$<strval>4, &@2); free($1); free($2);}
+              | ID ID               {declareVariable($2, CLASS, false, &$1, &@2);}
+              | ID ID ArrayDeclSize {declareVariable($2, CLASS, false, &$1, &@2);}
+              | ID ID '=' Exp       {declareVariable($2, CLASS, false, &$<strval>4, &@2);}
 
-              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, &$<strval>5, &@3); free($3);}
+              | CONST TypePredef ID '=' Exp {declareVariable($3, $<intval>2, true, &$<strval>5, &@3);}
               ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
@@ -205,21 +213,21 @@ ArrayDeclSize : '[' ConstIntExp ']'
 /* Function declaration */
 /************************/
 
-DeclFunc              : TypePredef ID '(' DeclParamList ')' '{' Stmts '}' {free($2);}
-                      | ID         ID '(' DeclParamList ')' '{' Stmts '}' {free($1); free($2);}
-                      | VOID       ID '(' DeclParamList ')' '{' Stmts '}' {free($2);}
+DeclFunc              : TypePredef ID {enterBlock();} '(' DeclParamList ')' {Type ret_t = {$1,0};     declareFunction($2, &ret_t, &$<typelistval>4);} '{' Stmts '}' {exitBlock();}
+                      | ID         ID {enterBlock();} '(' DeclParamList ')' {Type ret_t = {CLASS,$1}; declareFunction($2, &ret_t, &$<typelistval>4);} '{' Stmts '}' {exitBlock();}
+                      | VOID       ID {enterBlock();} '(' DeclParamList ')' {Type ret_t = {VOID,0};   declareFunction($2, &ret_t, &$<typelistval>4);} '{' Stmts '}' {exitBlock();}
                       ;
 
-DeclParamList         :
+DeclParamList         :                       {$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0;}
                       | DeclParamListNonEmpty
                       ;
 
-DeclParamListNonEmpty : DeclParam
-                      | DeclParamListNonEmpty ',' DeclParam
+DeclParamListNonEmpty : DeclParam                           {{$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0;} TypeList_insert(&$<typelistval>$, &$1);}
+                      | DeclParamListNonEmpty ',' DeclParam {TypeList_insert(&$<typelistval>1, &$3); $<typelistval>$ = $<typelistval>1;}
                       ;
 
-DeclParam             : TypePredef ID {free($2);}
-                      | ID ID         {free($1); free($2);}
+DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; long double val = 0; declareVariable($2, $<intval>1, false, &val, &@2);}
+                      | ID ID         {$$.type = CLASS; $$.class_name = $1; declareVariable($2, CLASS, false, &$1, &@2);}
                       ;
 
 
@@ -232,7 +240,7 @@ AccessModifier   : PUBLIC
                  | PRIVATE
                  ;
 
-DeclClass        : CLASS ID '{' DeclClassMembers '}' {free($2);}
+DeclClass        : CLASS ID {enterBlock();} '{' DeclClassMembers '}' {exitBlock();}
                  ;
 
 DeclClassMembers : DeclClassMember
@@ -335,24 +343,55 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void declareVariable(const char* name, int type, bool constant, void* data, const YYLTYPE* yylloc)
+
+
+void declareVariable(char* name, int type, bool constant, void* data, const YYLTYPE* yylloc)
 {
     int insert_position;
     const int current_position = VariableList_find(&varlist, name, &insert_position);
 
     if(current_position >= 0)
     {
-        //if(varlist.elements[current_position]->scope_level == scope_level)
+        if(varlist.elements[current_position].scope_level == scope_level)
         {
-            yyerror("variable %s is already declared at (%zu,%zu)", name, varlist.elements[current_position]->decl_line, varlist.elements[current_position]->decl_column);
+            yyerror("variable %s is already declared at (%zu,%zu)", name, varlist.elements[current_position].decl_line, varlist.elements[current_position].decl_column);
             return;
         }
-    }
 
-    const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, insert_position);
-    if(error == -1)
-    {
-        yyerror("not enough memory to declare variable %s", name);
-        abort();
+        const int error = VariableList_replace(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, current_position);
+        if(error == -1)
+        {
+            yyerror("not enough memory to declare variable %s", name);
+            abort();
+        }
     }
+    else
+    {
+        const int error = VariableList_insertAt(&varlist, name, strlen(name), type, scope_level, constant, data, yylloc->first_line, yylloc->first_column, insert_position);
+        if(error == -1)
+        {
+            yyerror("not enough memory to declare variable %s", name);
+            abort();
+        }
+    }
+}
+
+
+
+void declareFunction(char* name, const Type* return_type, TypeList* typelist)
+{
+
+}
+
+
+
+void enterBlock()
+{
+    VariableListStack_push(&varliststack, &varlist);
+    ++scope_level;
+}
+void exitBlock()
+{
+    VariableListStack_pop(&varliststack, &varlist);
+    --scope_level;
 }

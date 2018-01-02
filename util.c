@@ -1,6 +1,10 @@
 #include "util.h"
 #include "y.tab.h"
 
+extern int scope_level;
+
+
+
 void* memdup(const void* mem, size_t size)
 {
    void* new_mem = malloc(size);
@@ -31,50 +35,61 @@ int strassign(char** dst, int* dst_capacity, const char* src)
 
 
 /* Type */
-void Type_arrayDestroy(Type* array, int size)
+void TypeList_destroy(TypeList* list)
 {
-    for(int i = 0; i < size; ++i)
-        if(array[i].type == CLASS)
-            free(array[i].class_name);
-    free(array);
+    for(int i = 0; i < list->size; ++i)
+        if(list->elements[i].type == CLASS)
+            free(list->elements[i].class_name);
+
+    free(list->elements);
+    list->elements = NULL;
+    list->capacity = 0;
+    list->size = 0;
 }
 
-int Type_arrayInsert(Type** array, int* size, int* capacity, Type* element)
+int TypeList_insert(TypeList* list, Type* element)
 {
-    if(size == capacity)
+    if(list->size == list->capacity)
     {
-        const int new_capacity = (*capacity) + 1;
+        int new_capacity = 1 + list->capacity * 2;
+        Type* new_list = realloc(list->elements, new_capacity * sizeof(list->elements[0]));
+        if(new_list == NULL)
+        {
+            int new_capacity = 1 + list->capacity;
+            new_list = realloc(list->elements, new_capacity * sizeof(list->elements[0]));
+            if(new_list == NULL)
+                return -1;
+        }
 
-        Type* new_array = realloc(*array, new_capacity);
-        if(new_array == NULL)
-            return -1;
-
-        (*array) = new_array;
-        (*capacity) = new_capacity;
+        list->elements = new_list;
+        list->capacity = new_capacity;
     }
 
-    (*array)[*size] = (*element);
-    ++(*size);
+    list->elements[list->size] = (*element);
+    ++list->size;
 }
 
 
 
 /* VariableList */
-void VariableList_destroy(VariableList* list)
+void VariableList_destroy(VariableList* list, int scope_level)
 {
     for(int i = 0; i < list->size; ++i)
     {
-        switch(list->elements[i]->type)
+        if(list->elements[i].scope_level == scope_level || scope_level == -1)
         {
-        case STRING:
-            free(list->elements[i]->strval);
-            break;
-        case CLASS:
-            free(list->elements[i]->class_name);
-            break;
-        }
+            switch(list->elements[i].type)
+            {
+            case STRING:
+                free(list->elements[i].strval);
+                break;
+            case CLASS:
+                free(list->elements[i].class_name);
+                break;
+            }
 
-        free(list->elements[i]);
+            free(list->elements[i].name);
+        }
     }
 
     free(list->elements);
@@ -85,7 +100,7 @@ void VariableList_destroy(VariableList* list)
 
 int VariableList_copy(const VariableList* src, VariableList* dst)
 {
-    dst->elements = memdup(src->elements, src->capacity * sizeof(Variable*));
+    dst->elements = memdup(src->elements, src->capacity * sizeof(src->elements[0]));
     if(dst->elements == NULL)
         return -1;
 
@@ -102,7 +117,7 @@ int VariableList_find(VariableList* list, const char* name, int* insert_pos)
     while(first <= last)
     {
         const int mid = (first + last) / 2;
-        const int cmp = strcmp(name, list->elements[mid]->name);
+        const int cmp = strcmp(name, list->elements[mid].name);
 
         if(cmp == 0)
             return mid;
@@ -123,11 +138,11 @@ int VariableList_insertElement(VariableList* list, Variable* element, int positi
     if(list->size == list->capacity)
     {
         int new_capacity = 1 + list->capacity * 2;
-        Variable** new_list = realloc(list->elements, new_capacity * sizeof(Variable*));
+        Variable* new_list = realloc(list->elements, new_capacity * sizeof(list->elements[0]));
         if(new_list == NULL)
         {
             new_capacity = 1 + list->capacity;
-            new_list = realloc(list->elements, new_capacity * sizeof(Variable*));
+            new_list = realloc(list->elements, new_capacity * sizeof(list->elements[0]));
             if(new_list == NULL)
                 return -1;
         }
@@ -136,74 +151,50 @@ int VariableList_insertElement(VariableList* list, Variable* element, int positi
         list->capacity = new_capacity;
     }
 
-    memmove(list->elements + position + 1, list->elements + position, (list->size - position) * sizeof(Variable*));
-    list->elements[position] = element;
+    memmove(list->elements + position + 1, list->elements + position, (list->size - position) * sizeof(list->elements[0]));
+    list->elements[position] = (*element);
     ++list->size;
 
     return 0;
 }
 
-int VariableList_insertAt(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position)
+int VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position)
 {
-    Variable* element = malloc(sizeof(Variable) + name_length + 1);
-    if(element == NULL)
-        return -1;
-
-    void* free_on_error = NULL;
+    Variable element;
 
     switch(type)
     {
-    case INT:    element->intval    = *(const int*)   data; break;
-    case BOOL:   element->boolval   = *(const bool*)  data; break;
-    case DOUBLE: element->doubleval = *(const double*)data; break;
-    case CHAR:   element->charval   = *(const char*)  data; break;
+    case INT:    element.intval    = *(int*)   data; break;
+    case BOOL:   element.boolval   = *(bool*)  data; break;
+    case DOUBLE: element.doubleval = *(double*)data; break;
+    case CHAR:   element.charval   = *(char*)  data; break;
     case STRING:
     {
-        if((*((char**)data)) == NULL)
-            element->strval = NULL;
-        else
-        {
-            element->strval = memdup((*((char**)data)), strlen((*((char**)data))) + 1);
-            if(element->strval == NULL)
-                return -1;
-
-            free_on_error = element->strval;
-        }
+        element.strval = (*((char**)data));
         break;
     }
     case CLASS:
     {
-        if((*((char**)data)) == NULL)
-            return -1;
-
-        element->class_name = memdup((*((char**)data)), strlen((*((char**)data))) + 1);
-        if(element->class_name == NULL)
-            return -1;
-
-        free_on_error = element->class_name;
+        element.class_name = (*((char**)data));
         break;
     }
     }
 
-    memcpy(element->name, name, name_length + 1);
-    element->name_length = name_length;
-    element->type        = type;
-    element->scope_level = scope_level;
-    element->constant    = constant;
-    element->decl_line   = decl_line;
-    element->decl_column = decl_column;
+    element.name        = name;
+    element.name_length = name_length;
+    element.type        = type;
+    element.scope_level = scope_level;
+    element.constant    = constant;
+    element.decl_line   = decl_line;
+    element.decl_column = decl_column;
 
-    if(VariableList_insertElement(list, element, position) != 0)
-    {
-        free(free_on_error);
-        free(element);
+    if(VariableList_insertElement(list, &element, position) != 0)
         return -1;
-    }
 
     return 0;
 }
 
-int VariableList_insert(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column)
+int VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column)
 {
     int insert_position;
     if(VariableList_find(list, name, &insert_position) != -1)
@@ -212,12 +203,45 @@ int VariableList_insert(VariableList* list, const char* name, int name_length, i
     return VariableList_insertAt(list, name, name_length, type, scope_level, constant, data, decl_line, decl_column, insert_position);
 }
 
+int VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position)
+{
+    Variable* element = &list->elements[position];
+
+    switch(type)
+    {
+    case INT:    element->intval    = *(int*)   data; break;
+    case BOOL:   element->boolval   = *(bool*)  data; break;
+    case DOUBLE: element->doubleval = *(double*)data; break;
+    case CHAR:   element->charval   = *(char*)  data; break;
+    case STRING:
+    {
+        element->strval = (*((char**)data));
+        break;
+    }
+    case CLASS:
+    {
+        element->class_name = (*((char**)data));
+        break;
+    }
+    }
+
+    element->name        = name;
+    element->name_length = name_length;
+    element->type        = type;
+    element->scope_level = scope_level;
+    element->constant    = constant;
+    element->decl_line   = decl_line;
+    element->decl_column = decl_column;
+
+    return 0;
+}
+
 
 
 void VariableListStack_destroy(VariableListStack* stack)
 {
     for(int i = 0; i < stack->size; ++i)
-        VariableList_destroy(&stack->elements[i]);
+        VariableList_destroy(&stack->elements[i], i);
 
     free(stack->elements);
     stack->elements = NULL;
@@ -230,11 +254,11 @@ int VariableListStack_push(VariableListStack* stack, const VariableList* list)
     if(stack->size == stack->capacity)
     {
         int new_capacity = 1 + stack->capacity * 2;
-        VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(VariableList*));
+        VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(stack->elements[0]));
         if(new_stack == NULL)
         {
             int new_capacity = 1 + stack->capacity;
-            VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(VariableList*));
+            VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(stack->elements[0]));
             if(new_stack == NULL)
                 return -1;
         }
@@ -254,7 +278,16 @@ int VariableListStack_pop(VariableListStack* stack, VariableList* list)
         return -1;
 
     --stack->size;
+    VariableList_destroy(list, scope_level);
+    VariableList_copy(&stack->elements[stack->size], list);
     return 0;
+}
+
+VariableList* VariableListStack_top(VariableListStack* stack)
+{
+    if(stack->size == 0)
+        return NULL;
+    return &stack->elements[stack->size - 1];
 }
 
 

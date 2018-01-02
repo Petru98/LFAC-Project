@@ -68,7 +68,7 @@ MyClass c;
 c.x = 1;
 c.y = 2;
 print(c.getAvg());
-
+int y;
 
 
 // This is a comment

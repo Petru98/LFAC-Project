@@ -17,7 +17,6 @@ void yywarning(const char* msg, ...);
 
 void skipMultilineComment();
 
-int scope_level = 0;
 size_t yycolumnno = 1;
 extern YYLTYPE yylloc;
 
@@ -140,8 +139,8 @@ extern YYLTYPE yylloc;
 ";"  {return ';';}
 ","  {return ',';}
 ":"  {return ':';}
-"{"  {++scope_level; return '{';}
-"}"  {--scope_level; return '}';}
+"{"  {return '{';}
+"}"  {return '}';}
 "("  {return '(';}
 ")"  {return ')';}
 "["  {return '[';}

@@ -18,14 +18,23 @@ typedef struct Type
     char* class_name;
 } Type;
 
-void Type_arrayDestroy(Type* array, int size);
-int Type_arrayInsert(Type** array, int* size, int* capacity, Type* element);
+typedef struct TypeList
+{
+    Type* elements;
+    int size;
+    int capacity;
+} TypeList;
+
+void TypeList_destroy(TypeList* list);
+int  TypeList_insert(TypeList* list, Type* element);
 
 
 
 /* Variable */
 typedef struct Variable
 {
+    char* name;
+    int name_length;
     int type;
     int scope_level;
     int decl_line;
@@ -41,24 +50,22 @@ typedef struct Variable
         char* strval;
         char* class_name;
     };
-
-    int name_length;
-    char name[];
 } Variable;
 
 typedef struct VariableList
 {
-    Variable** elements;
+    Variable* elements;
     int size;
     int capacity;
 } VariableList;
 
-void VariableList_destroy(VariableList* list);
+void VariableList_destroy(VariableList* list, int scope_level);
 int  VariableList_copy(const VariableList* src, VariableList* dst);
 int  VariableList_find(VariableList* list, const char* name, int* insert_pos);
 int  VariableList_insertElement(VariableList* list, Variable* element, int position);
-int  VariableList_insertAt(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position);
-int  VariableList_insert(VariableList* list, const char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column);
+int  VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position);
+int  VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column);
+int  VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, void* data, int decl_line, int decl_column, int position);
 
 
 
@@ -72,6 +79,7 @@ typedef struct VariableListStack
 void VariableListStack_destroy(VariableListStack* stack);
 int  VariableListStack_push(VariableListStack* stack, const VariableList* list);
 int  VariableListStack_pop(VariableListStack* stack, VariableList* list);
+VariableList* VariableListStack_top(VariableListStack* stack);
 
 
 
