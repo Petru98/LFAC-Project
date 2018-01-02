@@ -32,6 +32,8 @@ void declareVariable(char* name, int type, bool constant, void* data, const YYLT
 void declareFunction(char* name, const Type* return_type, TypeList* typelist);
 void enterBlock();
 void exitBlock();
+
+void checkIfVariableIsDeclared(const char* name);
 %}
 
 /* Flags for yacc */
@@ -257,15 +259,16 @@ DeclClassMember  : AccessModifier DeclVar ';'
 /* Variable access */
 /*******************/
 
-VarAccess       : NormalVarAccess
+VarAccess       : ID                  {checkIfVariableIsDeclared($1); free($1);}
+                | ID VarAccessExtra   {checkIfVariableIsDeclared($1); free($1);}
                 | THIS
-                | THIS '.' NormalVarAccess
+                | THIS VarAccessExtra
                 ;
 
-NormalVarAccess : ID                                   {free($1);}
-                | ID '.' NormalVarAccess               {free($1);}
-                | ID ArrayIndexing                     {free($1);}
-                | ID ArrayIndexing '.' NormalVarAccess {free($1);}
+VarAccessExtra  : '.' ID                       {free($2);}
+                | '.' ID VarAccessExtra        {free($2);}
+                | ArrayIndexing                {}
+                | ArrayIndexing VarAccessExtra {}
                 ;
 
 ArrayIndexing   : '[' Exp ']'
@@ -394,4 +397,13 @@ void exitBlock()
 {
     VariableListStack_pop(&varliststack, &varlist);
     --scope_level;
+}
+
+
+
+void checkIfVariableIsDeclared(const char* name)
+{
+    const int position = VariableList_find(&varlist, name, NULL);
+    if(position == -1)
+        yyerror("Variable %s is undeclared", name);
 }
