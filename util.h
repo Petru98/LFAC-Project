@@ -27,6 +27,7 @@ typedef struct TypeList
 
 void TypeList_destroy(TypeList* list);
 int  TypeList_insert(TypeList* list, Type* element);
+bool TypeList_equal(const TypeList* llist, const TypeList* rlist);
 
 
 
@@ -62,7 +63,7 @@ typedef struct VariableList
 
 void VariableList_destroy(VariableList* list, int scope_level);
 int  VariableList_copy(const VariableList* src, VariableList* dst);
-int  VariableList_find(VariableList* list, const char* name, int* insert_pos);
+int  VariableList_find(const VariableList* list, const char* name, int* insert_pos);
 int  VariableList_insertElement(VariableList* list, Variable* element, int position);
 
 int  VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
@@ -91,27 +92,47 @@ VariableList* VariableListStack_top(VariableListStack* stack);
 /* Function */
 typedef struct Function
 {
+    char* name;
+    int name_length;
     int scope_level;
-    int params_count;
+    int decl_line;
+    int decl_column;
 
     Type return_type;
-    Type* params;
-
-    int name_length;
-    char name[];
+    TypeList paramtypes;
 } Function;
 
 typedef struct FunctionList
 {
-    Function** elements;
+    Function* elements;
     int size;
     int capacity;
 } FunctionList;
 
-void FunctionList_destroy(FunctionList* list);
-int  FunctionList_find(FunctionList* list, const char* name, int* insert_pos);
+void FunctionList_destroy(FunctionList* list, int scope_level);
+int  FunctionList_copy(const FunctionList* src, FunctionList* dst);
+int  FunctionList_find(const FunctionList* list, const char* name, const TypeList* typelist, int* insert_pos);
 int  FunctionList_insertElement(FunctionList* list, Function* element, int position);
-int  FunctionList_insertAt(FunctionList* list, const char* name, int name_length, int scope_level, const Type* return_type, Type* params, int params_count, int position);
-int  FunctionList_insert(FunctionList* list, const char* name, int name_length, int scope_level,  const Type* return_type, Type* params, int params_count);
+
+int  FunctionList_insertAt(FunctionList* list, char* name, int name_length, int scope_level, const Type* return_type, TypeList* paramtypes,
+                           int decl_line, int decl_column, int position);
+int  FunctionList_insert(FunctionList* list, char* name, int name_length, int scope_level,  const Type* return_type, TypeList* paramtypes,
+                         int decl_line, int decl_column);
+int  FunctionList_replace(FunctionList* list, char* name, int name_length, int scope_level,  const Type* return_type, TypeList* paramtypes,
+                          int decl_line, int decl_column, int position);
+
+
+
+typedef struct FunctionListStack
+{
+    FunctionList* elements;
+    int size;
+    int capacity;
+}FunctionListStack;
+
+void FunctionListStack_destroy(FunctionListStack* stack);
+int  FunctionListStack_push(FunctionListStack* stack, const FunctionList* list);
+int  FunctionListStack_pop(FunctionListStack* stack, FunctionList* list);
+FunctionList* FunctionListStack_top(FunctionListStack* stack);
 
 #endif

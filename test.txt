@@ -15,6 +15,14 @@ int sum(int x, int y)
     }
     return x + y;
 }
+int sum(int x, int z)
+{
+    return x + z;
+}
+int sum(int x, double z)
+{
+    return x + z;
+}
 void out(int x)
 {
     print(x);
@@ -53,14 +61,14 @@ class MyClass
     public int x;
     public int y;
 
+    private void update()
+    {
+        this.avg = (this.x + this.y) / 2;
+    }
     public double getAvg()
     {
         this.update();
         return avg;
-    }
-    private void update()
-    {
-        this.avg = (this.x + this.y) / 2;
     }
 }
 

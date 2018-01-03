@@ -34,7 +34,7 @@ int strassign(char** dst, int* dst_capacity, const char* src)
 
 
 
-/* Type */
+/* TypeList */
 void TypeList_destroy(TypeList* list)
 {
     for(int i = 0; i < list->size; ++i)
@@ -67,6 +67,22 @@ int TypeList_insert(TypeList* list, Type* element)
 
     list->elements[list->size] = (*element);
     ++list->size;
+}
+
+bool TypeList_equal(const TypeList* llist, const TypeList* rlist)
+{
+    if(llist->size != rlist->size)
+        return false;
+
+    for(int i = 0; i < llist->size; ++i)
+    {
+        if(llist->elements[i].type != rlist->elements[i].type)
+            return false;
+        if(llist->elements[i].type == CLASS && strcmp(llist->elements[i].class_name, rlist->elements[i].class_name) != 0)
+            return false;
+    }
+
+    return true;
 }
 
 
@@ -109,7 +125,7 @@ int VariableList_copy(const VariableList* src, VariableList* dst)
     return 0;
 }
 
-int VariableList_find(VariableList* list, const char* name, int* insert_pos)
+int VariableList_find(const VariableList* list, const char* name, int* insert_pos)
 {
     int first = 0;
     int last = list->size - 1;
@@ -243,6 +259,7 @@ int VariableList_replace(VariableList* list, char* name, int name_length, int ty
 
 
 
+/* VariableListStack */
 void VariableListStack_destroy(VariableListStack* stack)
 {
     for(int i = 0; i < stack->size; ++i)
@@ -263,7 +280,7 @@ int VariableListStack_push(VariableListStack* stack, const VariableList* list)
         if(new_stack == NULL)
         {
             int new_capacity = 1 + stack->capacity;
-            VariableList* new_stack = realloc(stack->elements, new_capacity * sizeof(stack->elements[0]));
+            new_stack = realloc(stack->elements, new_capacity * sizeof(stack->elements[0]));
             if(new_stack == NULL)
                 return -1;
         }
@@ -272,7 +289,9 @@ int VariableListStack_push(VariableListStack* stack, const VariableList* list)
         stack->capacity = new_capacity;
     }
 
-    VariableList_copy(list, &stack->elements[stack->size]);
+    if(VariableList_copy(list, &stack->elements[stack->size]) != 0)
+        return -1;
+
     ++stack->size;
     return 0;
 }
@@ -284,7 +303,7 @@ int VariableListStack_pop(VariableListStack* stack, VariableList* list)
 
     --stack->size;
     VariableList_destroy(list, scope_level);
-    VariableList_copy(&stack->elements[stack->size], list);
+    (*list) = stack->elements[stack->size];
     return 0;
 }
 
@@ -298,28 +317,38 @@ VariableList* VariableListStack_top(VariableListStack* stack)
 
 
 /* FunctionList */
-void FunctionList_destroy(FunctionList* list)
+void FunctionList_destroy(FunctionList* list, int scope_level)
 {
     for(int i = 0; i < list->size; ++i)
     {
-        if(list->elements[i]->return_type.type == CLASS)
-            free(list->elements[i]->return_type.class_name);
+        if(list->elements[i].scope_level == scope_level || scope_level == -1)
+        {
+            if(list->elements[i].return_type.type == CLASS)
+                free(list->elements[i].return_type.class_name);
 
-        for(int j = 0; j < list->elements[i]->params_count; ++i)
-            if(list->elements[i]->params[j].type == CLASS)
-                free(list->elements[i]->params[j].class_name);
-
-        free(list->elements[i]);
+            TypeList_destroy(&list->elements[i].paramtypes);
+            free(list->elements[i].name);
+        }
     }
 
     free(list->elements);
-
-    list->size = 0;
-    list->capacity = 0;
     list->elements = NULL;
+    list->capacity = 0;
+    list->size = 0;
 }
 
-int FunctionList_find(FunctionList* list, const char* name, int* insert_pos)
+int FunctionList_copy(const FunctionList* src, FunctionList* dst)
+{
+    dst->elements = memdup(src->elements, src->capacity * sizeof(src->elements[0]));
+    if(dst->elements == NULL)
+        return -1;
+
+    dst->capacity = src->capacity;
+    dst->size = src->size;
+    return 0;
+}
+
+int FunctionList_find(const FunctionList* list, const char* name, const TypeList* typelist, int* insert_pos)
 {
     int first = 0;
     int last = list->size - 1;
@@ -327,10 +356,30 @@ int FunctionList_find(FunctionList* list, const char* name, int* insert_pos)
     while(first <= last)
     {
         const int mid = (first + last) / 2;
-        const int cmp = strcmp(name, list->elements[mid]->name);
+        const int cmp = strcmp(name, list->elements[mid].name);
 
         if(cmp == 0)
-            return mid;
+        {
+            int tmp;
+            if(insert_pos == NULL)
+                insert_pos = &tmp;
+
+            int found_pos = -1;
+            (*insert_pos) = mid;
+
+            while((*insert_pos) < list->size && strcmp(name, list->elements[*insert_pos].name) == 0)
+            {
+                if(found_pos == -1 && TypeList_equal(&list->elements[*insert_pos].paramtypes, typelist) == true)
+                    found_pos = (*insert_pos);
+                ++(*insert_pos);
+            }
+
+            for(int i = mid - 1; found_pos == -1 && i >= 0 && strcmp(name, list->elements[i].name) == 0; --i)
+                if(TypeList_equal(&list->elements[i].paramtypes, typelist) == 0)
+                    found_pos = i;
+
+            return found_pos;
+        }
 
         if(cmp < 0)
             last = mid - 1;
@@ -347,12 +396,12 @@ int FunctionList_insertElement(FunctionList* list, Function* element, int positi
 {
     if(list->size == list->capacity)
     {
-        int new_capacity = 1 + list->capacity * sizeof(Function*) * 2;
-        Function** new_list = realloc(list->elements, new_capacity);
+        int new_capacity = 1 + list->capacity * 2;
+        Function* new_list = realloc(list->elements, new_capacity * sizeof(list->elements[0]));
         if(new_list == NULL)
         {
-            new_capacity = 1 + list->capacity * sizeof(Function*);
-            new_list = realloc(list->elements, new_capacity);
+            new_capacity = 1 + list->capacity;
+            new_list = realloc(list->elements, new_capacity * sizeof(list->elements[0]));
             if(new_list == NULL)
                 return -1;
         }
@@ -361,40 +410,111 @@ int FunctionList_insertElement(FunctionList* list, Function* element, int positi
         list->capacity = new_capacity;
     }
 
-    memmove(list->elements + position + 1, list->elements + position, (list->size - position) * sizeof(Function*));
-    list->elements[position] = element;
+    memmove(list->elements + position + 1, list->elements + position, (list->size - position) * sizeof(list->elements[0]));
+    list->elements[position] = (*element);
     ++list->size;
 
     return 0;
 }
 
-int FunctionList_insertAt(FunctionList* itemlist, const char* name, int name_length, int scope_level, const Type* return_type, Type* params, int params_count, int position)
+int FunctionList_insertAt(FunctionList* itemlist, char* name, int name_length, int scope_level, const Type* return_type, TypeList* paramtypes,
+                          int decl_line, int decl_column, int position)
 {
-    Function* element = malloc(sizeof(Function) + name_length + 1);
-    if(element == NULL)
-        return -1;
+    Function element;
 
-    if(FunctionList_insertElement(itemlist, element, position) == -1)
-    {
-        free(element);
-        return -1;
-    }
+    element.name         = name;
+    element.name_length  = name_length;
+    element.scope_level  = scope_level;
+    element.return_type  = (*return_type);
+    element.paramtypes   = (*paramtypes);
+    element.decl_line   = decl_line;
+    element.decl_column = decl_column;
 
-    memcpy(element->name, name, name_length + 1);
-    element->name_length  = name_length;
-    element->scope_level  = scope_level;
-    element->return_type  = (*return_type);
-    element->params       = params;
-    element->params_count = params_count;
+    if(FunctionList_insertElement(itemlist, &element, position) == -1)
+        return -1;
 
     return 0;
 }
 
-int FunctionList_insert(FunctionList* list, const char* name, int name_length, int scope_level, const Type* return_type, Type* params, int params_count)
+int FunctionList_insert(FunctionList* list, char* name, int name_length, int scope_level, const Type* return_type, TypeList* paramtypes,
+                        int decl_line, int decl_column)
 {
     int position;
-    if(FunctionList_find(list, name, &position) != -1)
+    if(FunctionList_find(list, name, paramtypes, &position) != -1)
         return 1;
 
-    return FunctionList_insertAt(list, name, name_length, scope_level, return_type, params, params_count, position);
+    return FunctionList_insertAt(list, name, name_length, scope_level, return_type, paramtypes, decl_line, decl_column, position);
+}
+
+int FunctionList_replace(FunctionList* list, char* name, int name_length, int scope_level,  const Type* return_type, TypeList* paramtypes,
+                         int decl_line, int decl_column, int position)
+{
+    Function* element = &list->elements[position];
+
+    element->name        = name;
+    element->name_length = name_length;
+    element->scope_level = scope_level;
+    element->return_type = (*return_type);
+    element->paramtypes  = (*paramtypes);
+    element->decl_line   = decl_line;
+    element->decl_column = decl_column;
+
+    return 0;
+}
+
+
+
+/* FunctionListStack */
+void FunctionListStack_destroy(FunctionListStack* stack)
+{
+    for(int i = 0; i < stack->size; ++i)
+        FunctionList_destroy(&stack->elements[i], i);
+
+    free(stack->elements);
+    stack->elements = NULL;
+    stack->capacity = 0;
+    stack->size = 0;
+}
+
+int FunctionListStack_push(FunctionListStack* stack, const FunctionList* list)
+{
+    if(stack->size == stack->capacity)
+    {
+        int new_capacity = 1 + stack->capacity * 2;
+        FunctionList* new_stack = realloc(stack->elements, new_capacity * sizeof(stack->elements[0]));
+        if(new_stack == NULL)
+        {
+            int new_capacity = 1 + stack->capacity;
+            new_stack = realloc(stack->elements, new_capacity * sizeof(stack->elements[0]));
+            if(new_stack == NULL)
+                return -1;
+        }
+
+        stack->elements = new_stack;
+        stack->capacity = new_capacity;
+    }
+
+    if(FunctionList_copy(list, &stack->elements[stack->size]) != 0)
+        return -1;
+
+    ++stack->size;
+    return 0;
+}
+
+int FunctionListStack_pop(FunctionListStack* stack, FunctionList* list)
+{
+    if(stack->size == 0)
+        return -1;
+
+    --stack->size;
+    FunctionList_destroy(list, scope_level);
+    (*list) = stack->elements[stack->size];
+    return 0;
+}
+
+FunctionList* FunctionListStack_top(FunctionListStack* stack)
+{
+    if(stack->size == 0)
+        return NULL;
+    return &stack->elements[stack->size - 1];
 }
