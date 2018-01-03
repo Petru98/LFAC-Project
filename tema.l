@@ -12,9 +12,6 @@
 #include "util.h"
 #include "y.tab.h"
 
-void yyerror(const char* msg, ...);
-void yywarning(const char* msg, ...);
-
 void skipMultilineComment();
 
 size_t yycolumnno = 1;

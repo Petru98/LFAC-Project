@@ -5,9 +5,13 @@
 #include <string.h>
 #include <stdbool.h>
 
-void* memdup(const void* mem, size_t size);
+void yyerror(const char* msg, ...);
+void yywarning(const char* msg, ...);
 
-int strassign(char** dst, int* dst_capacity, const char* src);
+
+
+/* Memory */
+void* memdup(const void* mem, size_t size);
 
 
 
@@ -17,6 +21,13 @@ typedef struct Type
     int type;
     char* class_name;
 } Type;
+
+const Type Type_invalid;
+const Type Type_bool;
+
+bool Type_equal(const Type* lval, const Type* rval);
+
+
 
 typedef struct TypeList
 {
@@ -36,7 +47,7 @@ typedef struct Variable
 {
     char* name;
     int name_length;
-    int type;
+    Type type;
     int scope_level;
     int decl_line;
     int decl_column;
@@ -45,12 +56,11 @@ typedef struct Variable
 
     union
     {
-        int intval;
+        long intval;
         bool boolval;
         double doubleval;
         char charval;
         char* strval;
-        char* class_name;
     };
 } Variable;
 
@@ -66,11 +76,11 @@ int  VariableList_copy(const VariableList* src, VariableList* dst);
 int  VariableList_find(const VariableList* list, const char* name, int* insert_pos);
 int  VariableList_insertElement(VariableList* list, Variable* element, int position);
 
-int  VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+int  VariableList_insertAt(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
                            void* data, int decl_line, int decl_column, int position);
-int  VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+int  VariableList_insert(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
                          void* data, int decl_line, int decl_column);
-int  VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+int  VariableList_replace(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
                           void* data, int decl_line, int decl_column, int position);
 
 
@@ -109,7 +119,7 @@ typedef struct FunctionList
     int capacity;
 } FunctionList;
 
-void FunctionList_destroy(FunctionList* list, int scope_level);
+void FunctionList_clear(FunctionList* list, int scope_level);
 int  FunctionList_copy(const FunctionList* src, FunctionList* dst);
 int  FunctionList_find(const FunctionList* list, const char* name, const TypeList* typelist, int* insert_pos);
 int  FunctionList_insertElement(FunctionList* list, Function* element, int position);
@@ -130,9 +140,58 @@ typedef struct FunctionListStack
     int capacity;
 }FunctionListStack;
 
-void FunctionListStack_destroy(FunctionListStack* stack);
+void FunctionListStack_clear(FunctionListStack* stack);
 int  FunctionListStack_push(FunctionListStack* stack, const FunctionList* list);
 int  FunctionListStack_pop(FunctionListStack* stack, FunctionList* list);
 FunctionList* FunctionListStack_top(FunctionListStack* stack);
 
+
+
+/* Expresion */
+typedef struct Expression
+{
+    Type type;
+    Variable* variable;
+
+    union
+    {
+        long intval;
+        bool boolval;
+        double doubleval;
+        char charval;
+        char* strval;
+    };
+} Expression;
+
+void Expression_set(Expression* exp, const Type* type, Variable* variable, void* data);
+void Expression_clear(Expression* exp);
+
+void Expression_assign(const Expression* lval, const Expression* rval, Expression* result);
+
+void Expression_preinc (const Expression* val, Expression* result);
+void Expression_predec (const Expression* val, Expression* result);
+void Expression_postinc(const Expression* val, Expression* result);
+void Expression_postdec(const Expression* val, Expression* result);
+
+void Expression_add(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_sub(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_mul(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_div(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_mod(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_neg(const Expression* val, Expression* result);
+
+void Expression_not(const Expression* val, Expression* result);
+void Expression_and(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_or (const Expression* lval, const Expression* rval, Expression* result);
+
+void Expression_eq (const Expression* lval, const Expression* rval, Expression* result);
+void Expression_neq(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_leq(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_geq(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_low(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_gre(const Expression* lval, const Expression* rval, Expression* result);
+
+
+
+bool Expression_getBool(const Expression* val);
 #endif

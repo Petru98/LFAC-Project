@@ -16,8 +16,6 @@
 #include "yylloc.h"
 #include "util.h"
 
-void yyerror(const char* msg, ...);
-void yywarning(const char* msg, ...);
 int yylex();
 
 extern FILE* yyin;
@@ -29,13 +27,14 @@ VariableListStack varliststack = {0};
 FunctionList funclist = {0};
 FunctionListStack funcliststack = {0};
 
-void declareVariable(VariableList* varlist, int scope_level, char* name, int type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc);
+void declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc);
 void declareFunction(FunctionList* funclist, int scope_level, char* name, const Type* return_type, TypeList* typelist, const YYLTYPE* yylloc);
 void enterBlock();
 void exitBlock();
 
 void checkIfVariableIsDeclared(const char* name);
 void checkIfVariableIsInitialized(const char* name);
+void checkIfFunctionIsDeclared(const char* name, const TypeList* typelist);
 %}
 
 /* Flags for yacc */
@@ -58,7 +57,7 @@ void checkIfVariableIsInitialized(const char* name);
 
 /* Tokens */
 %start Pgm
-%token <intval> INT BOOL DOUBLE CHAR STRING VOID
+%token <intval> INT BOOL DOUBLE CHAR STRING VOID INVAL_TYPE
 %token CONST PRINT IF ELSE WHILE DO FOR RETURN CLASS THIS PUBLIC PRIVATE
 
 %token <idval> ID
@@ -196,15 +195,15 @@ TypePredef : INT
 /************************/
 
 
-DeclVar       : TypePredef ID               {long double val = 0; declareVariable(&varlist, scope_level, $2, $<intval>1, false, false, &val, &@2);}
-              | TypePredef ID ArrayDeclSize {long double val = 0; declareVariable(&varlist, scope_level, $2, $<intval>1, false, false, &val, &@2);}
-              | TypePredef ID '=' Exp       {declareVariable(&varlist, scope_level, $2, $<intval>1, false, true, &$<strval>4, &@2);}
+DeclVar       : TypePredef ID               {long double val = 0; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, false, &val, &@2);}
+              | TypePredef ID ArrayDeclSize {long double val = 0; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, false, &val, &@2);}
+              | TypePredef ID '=' Exp       {Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, true, &$<strval>4, &@2);}
 
-              | ID ID               {declareVariable(&varlist, scope_level, $2, CLASS, false, false, &$1, &@2);}
-              | ID ID ArrayDeclSize {declareVariable(&varlist, scope_level, $2, CLASS, false, false, &$1, &@2);}
-              | ID ID '=' Exp       {declareVariable(&varlist, scope_level, $2, CLASS, false, true, &$<strval>4, &@2);}
+              | ID ID               {Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, false, &$1, &@2);}
+              | ID ID ArrayDeclSize {Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, false, &$1, &@2);}
+              | ID ID '=' Exp       {Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, true, &$<strval>4, &@2);}
 
-              | CONST TypePredef ID '=' Exp {declareVariable(&varlist, scope_level, $3, $<intval>2, true, true, &$<strval>5, &@3);}
+              | CONST TypePredef ID '=' Exp {Type t = {$2, NULL}; declareVariable(&varlist, scope_level, $3, &t, true, true, &$<strval>5, &@3);}
               ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
@@ -230,8 +229,8 @@ DeclParamListNonEmpty : DeclParam                           {$<typelistval>$.ele
                       | DeclParamListNonEmpty ',' DeclParam {TypeList_insert(&$<typelistval>1, &$3); $<typelistval>$ = $<typelistval>1;}
                       ;
 
-DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; long double val = 0; declareVariable(&varlist, scope_level, $2, $<intval>1, false, true, &val, &@2);}
-                      | ID ID         {$$.type = CLASS; $$.class_name = $1; declareVariable(&varlist, scope_level, $2, CLASS, false, true, &$1, &@2);}
+DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; long double val = 0; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, true, &val, &@2);}
+                      | ID ID         {$$.type = CLASS; $$.class_name = $1; Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, true, NULL, &@2);}
                       ;
 
 
@@ -244,7 +243,7 @@ AccessModifier   : PUBLIC
                  | PRIVATE
                  ;
 
-DeclClass        : CLASS ID {enterBlock(); char* s = strdup($2); declareVariable(&varlist, scope_level, strdup("this"), CLASS, true, true, &s, &yylloc);} '{' DeclClassMembers '}' {exitBlock();}
+DeclClass        : CLASS ID {enterBlock(); Type t = {CLASS, strdup($2)}; declareVariable(&varlist, scope_level, strdup("this"), &t, true, true, NULL, &yylloc);} '{' DeclClassMembers '}' {exitBlock();}
                  ;
 
 DeclClassMembers : DeclClassMember
@@ -283,11 +282,11 @@ ArrayIndexing   : '[' Exp ']'
 /* Function call */
 /*****************/
 
-FuncCall         : VarAccess '(' FuncParamExpList ')'
+FuncCall         : VarAccess '(' FuncParamExpList ')' {/*checkIfFunctionIsDeclared($1, &$<typelistval>3); free($1); TypeList_clear(&$<typelistval>3);*/}
                  ;
 
 FuncParamExpList :
-                 | Exp
+                 | Exp                      {/*$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0; TypeList_insert(&$<typelistval>$, );*/}
                  | FuncParamExpList ',' Exp
                  ;
 
@@ -350,7 +349,7 @@ int main(int argc, char** argv)
 
 
 
-void declareVariable(VariableList* varlist, int scope_level, char* name, int type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc)
+void declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc)
 {
     if(name == NULL)
     {
@@ -464,4 +463,11 @@ void checkIfVariableIsInitialized(const char* name)
     const int position = VariableList_find(&varlist, name, NULL);
     if(position >= 0 && varlist.elements[position].initialized == false)
         yywarning("Variable %s was not explicitly initialized", name);
+}
+
+void checkIfFunctionIsDeclared(const char* name, const TypeList* typelist)
+{
+    const int position = FunctionList_find(&funclist, name, typelist, NULL);
+    if(position == -1)
+        yyerror("Function %s is undeclared", name);
 }

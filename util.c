@@ -14,28 +14,34 @@ void* memdup(const void* mem, size_t size)
    return new_mem;
 }
 
-int strassign(char** dst, int* dst_capacity, const char* src)
+int compareStrings(const char* s, const char* t)
 {
-    const int len = strlen(src);
-    if((len + 1) > (*dst_capacity))
+    if(s == NULL || s[0] == '\0')
     {
-        char* new_dst = malloc(len + 1);
-        if(new_dst == NULL)
-            return -1;
-
-        free(*dst);
-        (*dst) = new_dst;
-        (*dst_capacity) = len + 1;
+        if(t == NULL || t[0] == '\0')
+            return 0;
+        return -1;
     }
 
-    memcpy(*dst, src, len);
-    return len;
+    if(t == NULL || t[0] == '\0')
+        return 1;
+    return strcmp(s, t);
 }
 
 
 
-/* TypeList */
-void TypeList_destroy(TypeList* list)
+/* Type */
+const Type Type_invalid = {INVAL_TYPE, NULL};
+const Type Type_bool = {BOOL, NULL};
+
+bool Type_equal(const Type* lval, const Type* rval)
+{
+    return lval->type == rval->type && (lval->type != CLASS || strcmp(lval->class_name, rval->class_name) == 0);
+}
+
+
+
+void TypeList_clear(TypeList* list)
 {
     for(int i = 0; i < list->size; ++i)
         if(list->elements[i].type == CLASS)
@@ -88,19 +94,19 @@ bool TypeList_equal(const TypeList* llist, const TypeList* rlist)
 
 
 /* VariableList */
-void VariableList_destroy(VariableList* list, int scope_level)
+void VariableList_clear(VariableList* list, int scope_level)
 {
     for(int i = 0; i < list->size; ++i)
     {
         if(list->elements[i].scope_level == scope_level || scope_level == -1)
         {
-            switch(list->elements[i].type)
+            switch(list->elements[i].type.type)
             {
             case STRING:
                 free(list->elements[i].strval);
                 break;
             case CLASS:
-                free(list->elements[i].class_name);
+                free(list->elements[i].type.class_name);
                 break;
             }
 
@@ -174,32 +180,23 @@ int VariableList_insertElement(VariableList* list, Variable* element, int positi
     return 0;
 }
 
-int VariableList_insertAt(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+int VariableList_insertAt(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
                           void* data, int decl_line, int decl_column, int position)
 {
     Variable element;
 
-    switch(type)
+    switch(type->type)
     {
-    case INT:    element.intval    = *(int*)   data; break;
-    case BOOL:   element.boolval   = *(bool*)  data; break;
-    case DOUBLE: element.doubleval = *(double*)data; break;
-    case CHAR:   element.charval   = *(char*)  data; break;
-    case STRING:
-    {
-        element.strval = (*((char**)data));
-        break;
-    }
-    case CLASS:
-    {
-        element.class_name = (*((char**)data));
-        break;
-    }
+    case INT:    element.intval    = *((int*)   data); break;
+    case BOOL:   element.boolval   = *((bool*)  data); break;
+    case DOUBLE: element.doubleval = *((double*)data); break;
+    case CHAR:   element.charval   = *((char*)  data); break;
+    case STRING: element.strval    = *((char**) data); break;
     }
 
     element.name        = name;
     element.name_length = name_length;
-    element.type        = type;
+    element.type        = (*type);
     element.scope_level = scope_level;
     element.constant    = constant;
     element.initialized = initialized;
@@ -212,7 +209,7 @@ int VariableList_insertAt(VariableList* list, char* name, int name_length, int t
     return 0;
 }
 
-int VariableList_insert(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+int VariableList_insert(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
                         void* data, int decl_line, int decl_column)
 {
     int insert_position;
@@ -222,32 +219,23 @@ int VariableList_insert(VariableList* list, char* name, int name_length, int typ
     return VariableList_insertAt(list, name, name_length, type, scope_level, constant, initialized, data, decl_line, decl_column, insert_position);
 }
 
-int VariableList_replace(VariableList* list, char* name, int name_length, int type, int scope_level, bool constant, bool initialized,
+int VariableList_replace(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
                          void* data, int decl_line, int decl_column, int position)
 {
     Variable* element = &list->elements[position];
 
-    switch(type)
+    switch(type->type)
     {
-    case INT:    element->intval    = *(int*)   data; break;
-    case BOOL:   element->boolval   = *(bool*)  data; break;
-    case DOUBLE: element->doubleval = *(double*)data; break;
-    case CHAR:   element->charval   = *(char*)  data; break;
-    case STRING:
-    {
-        element->strval = (*((char**)data));
-        break;
-    }
-    case CLASS:
-    {
-        element->class_name = (*((char**)data));
-        break;
-    }
+    case INT:    element->intval    = *((int*)   data); break;
+    case BOOL:   element->boolval   = *((bool*)  data); break;
+    case DOUBLE: element->doubleval = *((double*)data); break;
+    case CHAR:   element->charval   = *((char*)  data); break;
+    case STRING: element->strval    = *((char**) data); break;
     }
 
     element->name        = name;
     element->name_length = name_length;
-    element->type        = type;
+    element->type        = (*type);
     element->scope_level = scope_level;
     element->constant    = constant;
     element->initialized = initialized;
@@ -260,10 +248,10 @@ int VariableList_replace(VariableList* list, char* name, int name_length, int ty
 
 
 /* VariableListStack */
-void VariableListStack_destroy(VariableListStack* stack)
+void VariableListStack_clear(VariableListStack* stack)
 {
     for(int i = 0; i < stack->size; ++i)
-        VariableList_destroy(&stack->elements[i], i);
+        VariableList_clear(&stack->elements[i], i);
 
     free(stack->elements);
     stack->elements = NULL;
@@ -302,7 +290,7 @@ int VariableListStack_pop(VariableListStack* stack, VariableList* list)
         return -1;
 
     --stack->size;
-    VariableList_destroy(list, scope_level);
+    VariableList_clear(list, scope_level);
     (*list) = stack->elements[stack->size];
     return 0;
 }
@@ -317,7 +305,7 @@ VariableList* VariableListStack_top(VariableListStack* stack)
 
 
 /* FunctionList */
-void FunctionList_destroy(FunctionList* list, int scope_level)
+void FunctionList_clear(FunctionList* list, int scope_level)
 {
     for(int i = 0; i < list->size; ++i)
     {
@@ -326,7 +314,7 @@ void FunctionList_destroy(FunctionList* list, int scope_level)
             if(list->elements[i].return_type.type == CLASS)
                 free(list->elements[i].return_type.class_name);
 
-            TypeList_destroy(&list->elements[i].paramtypes);
+            TypeList_clear(&list->elements[i].paramtypes);
             free(list->elements[i].name);
         }
     }
@@ -465,10 +453,10 @@ int FunctionList_replace(FunctionList* list, char* name, int name_length, int sc
 
 
 /* FunctionListStack */
-void FunctionListStack_destroy(FunctionListStack* stack)
+void FunctionListStack_clear(FunctionListStack* stack)
 {
     for(int i = 0; i < stack->size; ++i)
-        FunctionList_destroy(&stack->elements[i], i);
+        FunctionList_clear(&stack->elements[i], i);
 
     free(stack->elements);
     stack->elements = NULL;
@@ -507,7 +495,7 @@ int FunctionListStack_pop(FunctionListStack* stack, FunctionList* list)
         return -1;
 
     --stack->size;
-    FunctionList_destroy(list, scope_level);
+    FunctionList_clear(list, scope_level);
     (*list) = stack->elements[stack->size];
     return 0;
 }
@@ -517,4 +505,547 @@ FunctionList* FunctionListStack_top(FunctionListStack* stack)
     if(stack->size == 0)
         return NULL;
     return &stack->elements[stack->size - 1];
+}
+
+
+
+/* Expression */
+void Expression_set(Expression* exp, const Type* type, Variable* variable, void* data)
+{
+    exp->variable = variable;
+
+    if(variable == NULL)
+    {
+        exp->type = (*type);
+
+        switch(type->type)
+        {
+        case INT:    exp->intval    = *((int*)   data); break;
+        case BOOL:   exp->boolval   = *((bool*)  data); break;
+        case DOUBLE: exp->doubleval = *((double*)data); break;
+        case CHAR:   exp->charval   = *((char*)  data); break;
+        case STRING: exp->strval    = *((char**) data); break;
+        }
+    }
+    else
+    {
+        exp->type = variable->type;
+
+        switch(type->type)
+        {
+        case INT:    exp->intval    = variable->intval;    break;
+        case BOOL:   exp->boolval   = variable->boolval;   break;
+        case DOUBLE: exp->doubleval = variable->doubleval; break;
+        case CHAR:   exp->charval   = variable->charval;   break;
+        case STRING: exp->strval    = variable->strval;    break;
+        }
+    }
+}
+void Expression_clear(Expression* exp)
+{
+    if(exp->variable == NULL)
+    {
+        if(exp->type.type == STRING)
+            free(exp->strval);
+        else if(exp->type.type == CLASS)
+            free(exp->type.class_name);
+    }
+
+    exp->type = Type_invalid;
+    exp->variable = NULL;
+}
+
+void Expression_assign(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(lval->variable == NULL)
+    {
+        yyerror("left side of assignment must be a lval");
+        return;
+    }
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of assignment have different types");
+        return;
+    }
+
+    switch(lval->type.type)
+    {
+    case INT:    lval->variable->intval    = rval->variable->intval;    break;
+    case BOOL:   lval->variable->boolval   = rval->variable->boolval;   break;
+    case DOUBLE: lval->variable->doubleval = rval->variable->doubleval; break;
+    case CHAR:   lval->variable->charval   = rval->variable->charval;   break;
+    case STRING: free(lval->variable->strval); lval->variable->strval = rval->variable->strval;    break;
+    }
+
+    Expression_set(result, NULL, lval->variable, NULL);
+}
+
+void Expression_preinc(const Expression* val, Expression* result)
+{
+    Expression_clear(result);
+    if(val->type.type == INVAL_TYPE)
+        return;
+
+    if(val->variable == NULL)
+    {
+        yyerror("expression must be a lval");
+        return;
+    }
+
+    switch(val->type.type)
+    {
+    case INT:    ++val->variable->intval; break;
+    case BOOL:   ++val->variable->intval; break;
+    case DOUBLE: ++val->variable->intval; break;
+    case CHAR:   ++val->variable->intval; break;
+    case STRING: yyerror("preincrement is an invalid operation for string"); break;
+    case CLASS:  yyerror("preincrement is an invalid operation for %s", val->type.class_name); break;
+    }
+
+    Expression_set(result, NULL, val->variable, NULL);
+}
+void Expression_predec(const Expression* val, Expression* result)
+{
+    Expression_clear(result);
+    if(val->type.type == INVAL_TYPE)
+        return;
+
+    if(val->variable == NULL)
+    {
+        yyerror("expression must be a lval");
+        return;
+    }
+
+    switch(val->type.type)
+    {
+    case INT:    --val->variable->intval; break;
+    case BOOL:   --val->variable->intval; break;
+    case DOUBLE: --val->variable->intval; break;
+    case CHAR:   --val->variable->intval; break;
+    case STRING: yyerror("predecrement is an invalid operation for string"); break;
+    case CLASS:  yyerror("predecrement is an invalid operation for %s", val->type.class_name); break;
+    }
+
+    Expression_set(result, NULL, val->variable, NULL);
+}
+void Expression_postinc(const Expression* val, Expression* result)
+{
+    Expression_clear(result);
+    if(val->type.type == INVAL_TYPE)
+        return;
+
+    if(val->variable == NULL)
+    {
+        yyerror("expression must be a lval");
+        return;
+    }
+
+    switch(val->type.type)
+    {
+    case INT:    Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
+    case BOOL:   Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
+    case DOUBLE: Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
+    case CHAR:   Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
+    case STRING: yyerror("postincrement is an invalid operation for string"); break;
+    case CLASS:  yyerror("postincrement is an invalid operation for %s", val->type.class_name); break;
+    }
+}
+void Expression_postdec(const Expression* val, Expression* result)
+{
+    Expression_clear(result);
+    if(val->type.type == INVAL_TYPE)
+        return;
+
+    if(val->variable == NULL)
+    {
+        yyerror("expression must be a lval");
+        return;
+    }
+
+    switch(val->type.type)
+    {
+    case INT:    Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
+    case BOOL:   Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
+    case DOUBLE: Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
+    case CHAR:   Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
+    case STRING: yyerror("postdecrement is an invalid operation for string"); break;
+    case CLASS:  yyerror("postdecrement is an invalid operation for %s", val->type.class_name); break;
+    }
+}
+
+void Expression_add(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of addition have different types");
+        return;
+    }
+
+    switch(lval->type.type)
+    {
+    case INT:    {long   x = lval->intval    + rval->intval;    Expression_set(result, &lval->type, NULL, &x);} break;
+    case BOOL:   {bool   x = lval->boolval  != rval->boolval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case DOUBLE: {double x = lval->doubleval + rval->doubleval; Expression_set(result, &lval->type, NULL, &x);} break;
+    case CHAR:   {char   x = lval->charval   + rval->charval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case STRING:
+    {
+        const int llen = strlen(lval->strval);
+        const int rlen = strlen(lval->strval);
+        char* x = malloc(llen + rlen + 1);
+        if(x == NULL)
+        {
+            yyerror("not enough memory to allocate %d bytes for string addition result", llen + rlen + 1);
+            abort();
+        }
+
+        memcpy(x, lval->strval, llen);
+        memcpy(x + llen, rval->strval, rlen + 1);
+        Expression_set(result, &lval->type, NULL, &x);
+        break;
+    }
+    case CLASS: yyerror("addition is an invalid operation for %s", lval->type.class_name); break;
+    }
+}
+void Expression_sub(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of substraction have different types");
+        return;
+    }
+
+    switch(lval->type.type)
+    {
+    case INT:    {long   x = lval->intval    - rval->intval;    Expression_set(result, &lval->type, NULL, &x);} break;
+    case BOOL:   {bool   x = lval->boolval  != rval->boolval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case DOUBLE: {double x = lval->doubleval - rval->doubleval; Expression_set(result, &lval->type, NULL, &x);} break;
+    case CHAR:   {char   x = lval->charval   - rval->charval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case STRING: yyerror("substraction is an invalid operation for string", lval->type.class_name); break;
+    case CLASS:  yyerror("substraction is an invalid operation for %s", lval->type.class_name); break;
+    }
+}
+void Expression_mul(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of multiplication have different types");
+        return;
+    }
+
+    switch(lval->type.type)
+    {
+    case INT:    {long   x = lval->intval    * rval->intval;    Expression_set(result, &lval->type, NULL, &x);} break;
+    case BOOL:   {bool   x = lval->boolval  && rval->boolval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case DOUBLE: {double x = lval->doubleval * rval->doubleval; Expression_set(result, &lval->type, NULL, &x);} break;
+    case CHAR:   {char   x = lval->charval   * rval->charval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case STRING: yyerror("multiplication is an invalid operation for string", lval->type.class_name); break;
+    case CLASS:  yyerror("multiplication is an invalid operation for %s", lval->type.class_name); break;
+    }
+}
+void Expression_div(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of division have different types");
+        return;
+    }
+
+    switch(lval->type.type)
+    {
+    case INT:    {long   x = lval->intval    / rval->intval;    Expression_set(result, &lval->type, NULL, &x);} break;
+    case BOOL:   yyerror("division is an invalid operation for bool");                      break;
+    case DOUBLE: {double x = lval->doubleval / rval->doubleval; Expression_set(result, &lval->type, NULL, &x);} break;
+    case CHAR:   {char   x = lval->charval   / rval->charval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case STRING: yyerror("division is an invalid operation for string");                    break;
+    case CLASS:  yyerror("division is an invalid operation for %s", lval->type.class_name); break;
+    }
+}
+void Expression_mod(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of modulus have different types");
+        return;
+    }
+
+    switch(lval->type.type)
+    {
+    case INT:    {long   x = lval->intval    / rval->intval;    Expression_set(result, &lval->type, NULL, &x);} break;
+    case BOOL:   yyerror("modulus is an invalid operation for bool");                      break;
+    case DOUBLE: yyerror("modulus is an invalid operation for double");                    break;
+    case CHAR:   {char   x = lval->charval   / rval->charval;   Expression_set(result, &lval->type, NULL, &x);} break;
+    case STRING: yyerror("modulus is an invalid operation for string");                    break;
+    case CLASS:  yyerror("modulus is an invalid operation for %s", lval->type.class_name); break;
+    }
+}
+void Expression_neg(const Expression* val, Expression* result)
+{
+    Expression_clear(result);
+    if(val->type.type == INVAL_TYPE)
+        return;
+
+    switch(val->type.type)
+    {
+    case INT:    {long   x = -val->intval;    Expression_set(result, &val->type, NULL, &x);} break;
+    case BOOL:   {bool   x = -val->boolval;   Expression_set(result, &val->type, NULL, &x);} break;
+    case DOUBLE: {double x = -val->doubleval; Expression_set(result, &val->type, NULL, &x);} break;
+    case CHAR:   {char   x = -val->charval;   Expression_set(result, &val->type, NULL, &x);} break;
+    case STRING: yyerror("unary minus is an invalid operation for string");                   break;
+    case CLASS:  yyerror("unary minus is an invalid operation for %s", val->type.class_name); break;
+    }
+}
+
+void Expression_not(const Expression* val, Expression* result)
+{
+    Expression_clear(result);
+    if(val->type.type == INVAL_TYPE)
+        return;
+
+    switch(val->type.type)
+    {
+    case INT:    {long   x = !val->intval;    Expression_set(result, &val->type, NULL, &x);} break;
+    case BOOL:   {bool   x = !val->boolval;   Expression_set(result, &val->type, NULL, &x);} break;
+    case DOUBLE: {double x = !val->doubleval; Expression_set(result, &val->type, NULL, &x);} break;
+    case CHAR:   {char   x = !val->charval;   Expression_set(result, &val->type, NULL, &x);} break;
+    case STRING: yyerror("negation is an invalid operation for string");                   break;
+    case CLASS:  yyerror("negation is an invalid operation for %s", val->type.class_name); break;
+    }
+}
+void Expression_and(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(lval->type.type == CLASS)
+    {
+        yyerror("conversion to bool is an invalid operation for %s", lval->type.class_name);
+        return;
+    }
+    if(rval->type.type == CLASS)
+    {
+        yyerror("conversion to bool is an invalid operation for %s", rval->type.class_name);
+        return;
+    }
+
+    bool x = Expression_getBool(lval) && Expression_getBool(rval);
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+void Expression_or(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(lval->type.type == CLASS)
+    {
+        yyerror("conversion to bool is an invalid operation for %s", lval->type.class_name);
+        return;
+    }
+    if(rval->type.type == CLASS)
+    {
+        yyerror("conversion to bool is an invalid operation for %s", rval->type.class_name);
+        return;
+    }
+
+    bool x = Expression_getBool(lval) || Expression_getBool(rval);
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+
+void Expression_eq(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of '==' have different types");
+        return;
+    }
+
+    bool x;
+
+    switch(lval->type.type)
+    {
+    case INT:    x = (lval->intval    == rval->intval);         break;
+    case BOOL:   x = (lval->boolval   == rval->boolval);        break;
+    case DOUBLE: x = (lval->doubleval == rval->doubleval);      break;
+    case CHAR:   x = (lval->charval   == rval->charval);        break;
+    case STRING: x = (compareStrings(lval->strval, rval->strval) == 0); break;
+    case CLASS: yyerror("'==' is an invalid operation for %s", lval->type.class_name); break;
+    }
+
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+void Expression_neq(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of '!=' have different types");
+        return;
+    }
+
+    bool x;
+
+    switch(lval->type.type)
+    {
+    case INT:    x = (lval->intval    != rval->intval);         break;
+    case BOOL:   x = (lval->boolval   != rval->boolval);        break;
+    case DOUBLE: x = (lval->doubleval != rval->doubleval);      break;
+    case CHAR:   x = (lval->charval   != rval->charval);        break;
+    case STRING: x = (compareStrings(lval->strval, rval->strval) != 0); break;
+    case CLASS: yyerror("'!=' is an invalid operation for %s", lval->type.class_name); break;
+    }
+
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+void Expression_leq(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of '<=' have different types");
+        return;
+    }
+
+    bool x;
+
+    switch(lval->type.type)
+    {
+    case INT:    x = (lval->intval    <= rval->intval);         break;
+    case BOOL:   x = (lval->boolval   <= rval->boolval);        break;
+    case DOUBLE: x = (lval->doubleval <= rval->doubleval);      break;
+    case CHAR:   x = (lval->charval   <= rval->charval);        break;
+    case STRING: x = (compareStrings(lval->strval, rval->strval) <= 0); break;
+    case CLASS: yyerror("'<=' is an invalid operation for %s", lval->type.class_name); break;
+    }
+
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+void Expression_geq(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of '>=' have different types");
+        return;
+    }
+
+    bool x;
+
+    switch(lval->type.type)
+    {
+    case INT:    x = (lval->intval    >= rval->intval);         break;
+    case BOOL:   x = (lval->boolval   >= rval->boolval);        break;
+    case DOUBLE: x = (lval->doubleval >= rval->doubleval);      break;
+    case CHAR:   x = (lval->charval   >= rval->charval);        break;
+    case STRING: x = (compareStrings(lval->strval, rval->strval) >= 0); break;
+    case CLASS: yyerror("'>=' is an invalid operation for %s", lval->type.class_name); break;
+    }
+
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+void Expression_low(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of '<' have different types");
+        return;
+    }
+
+    bool x;
+
+    switch(lval->type.type)
+    {
+    case INT:    x = (lval->intval    < rval->intval);         break;
+    case BOOL:   x = (lval->boolval   < rval->boolval);        break;
+    case DOUBLE: x = (lval->doubleval < rval->doubleval);      break;
+    case CHAR:   x = (lval->charval   < rval->charval);        break;
+    case STRING: x = (compareStrings(lval->strval, rval->strval) < 0); break;
+    case CLASS: yyerror("'<' is an invalid operation for %s", lval->type.class_name); break;
+    }
+
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+void Expression_gre(const Expression* lval, const Expression* rval, Expression* result)
+{
+    Expression_clear(result);
+    if(lval->type.type == INVAL_TYPE || rval->type.type == INVAL_TYPE)
+        return;
+
+    if(Type_equal(&lval->type, &rval->type) == false)
+    {
+        yyerror("the sides of '>' have different types");
+        return;
+    }
+
+    bool x;
+
+    switch(lval->type.type)
+    {
+    case INT:    x = (lval->intval    > rval->intval);         break;
+    case BOOL:   x = (lval->boolval   > rval->boolval);        break;
+    case DOUBLE: x = (lval->doubleval > rval->doubleval);      break;
+    case CHAR:   x = (lval->charval   > rval->charval);        break;
+    case STRING: x = (compareStrings(lval->strval, rval->strval) > 0); break;
+    case CLASS: yyerror("'>' is an invalid operation for %s", lval->type.class_name); break;
+    }
+
+    Expression_set(result, &Type_bool, NULL, &x);
+}
+
+
+
+bool Expression_getBool(const Expression* val)
+{
+    switch(val->type.type)
+    {
+    case INT:    return val->intval;                   break;
+    case BOOL:   return val->boolval;                  break;
+    case DOUBLE: return val->doubleval;                break;
+    case CHAR:   return val->charval;                  break;
+    case STRING: return val->strval && val->strval[0]; break;
+    default:
+        yyerror("debug: Expression_bool: expression is invalid");
+        abort();
+    }
 }
