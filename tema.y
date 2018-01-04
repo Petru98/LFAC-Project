@@ -27,14 +27,18 @@ VariableListStack varliststack = {0};
 FunctionList funclist = {0};
 FunctionListStack funcliststack = {0};
 
-void declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc);
-void declareFunction(FunctionList* funclist, int scope_level, char* name, const Type* return_type, TypeList* typelist, const YYLTYPE* yylloc);
+Variable* declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, const YYLTYPE* yylloc);
+Function* declareFunction(FunctionList* funclist, int scope_level, char* name, const Type* return_type, TypeList* typelist, const YYLTYPE* yylloc);
 void enterBlock();
 void exitBlock();
 
-void checkIfVariableIsDeclared(const char* name);
-void checkIfVariableIsInitialized(const char* name);
-void checkIfFunctionIsDeclared(const char* name, const TypeList* typelist);
+Variable* isVarDecl(const char* name);
+bool      isVarInit(const Variable* var);
+void      initVar(Variable* var, const Expression* exp);
+
+Function* isFuncDecl(const char* name, const TypeList* typelist);
+
+bool isExpConvToBool(const Expression* exp);
 %}
 
 /* Flags for yacc */
@@ -53,6 +57,9 @@ void checkIfFunctionIsDeclared(const char* name, const TypeList* typelist);
     char* idval;
     Type typeval;
     TypeList typelistval;
+    Variable* varval;
+    Function* funcval;
+    Expression expval;
 }
 
 /* Tokens */
@@ -72,6 +79,7 @@ void checkIfFunctionIsDeclared(const char* name, const TypeList* typelist);
 /* Types for non-terminal */
 %type <intval> TypePredef
 %type <typeval> DeclParam
+%type <expval> Exp
 
 /* Precedence */
 %left ','
@@ -107,18 +115,18 @@ Stmt  : ';'
       | DeclVar ';'
       | DeclFunc
       | DeclClass
-      | Exp ';'
+      | Exp ';'                       {Expression_clear(&$<expval>1);}
       | '{' {enterBlock();} Stmts '}' {exitBlock();}
       | '{''}'
 
-      | PRINT '(' Exp ')' ';'
-      | RETURN Exp ';'
+      | PRINT '(' Exp ')' ';'         {Expression_clear(&$<expval>3);}
+      | RETURN Exp ';'                {Expression_clear(&$<expval>2);}
 
-      | IF '(' Exp ')' Stmt           %prec NOELSE
-      | IF '(' Exp ')' Stmt ELSE Stmt
+      | IF '(' Exp ')' Stmt           %prec NOELSE {isExpConvToBool(&$<expval>3); Expression_clear(&$<expval>3);}
+      | IF '(' Exp ')' Stmt ELSE Stmt              {isExpConvToBool(&$<expval>3); Expression_clear(&$<expval>3);}
 
-      | WHILE '(' Exp ')' Stmt
-      | DO Stmt WHILE '(' Exp ')' ';'
+      | WHILE '(' Exp ')' Stmt        {isExpConvToBool(&$<expval>3); Expression_clear(&$<expval>3);}
+      | DO Stmt WHILE '(' Exp ')' ';' {isExpConvToBool(&$<expval>5); Expression_clear(&$<expval>5);}
 
       | FOR '(' ForInitExp ';' ForCondExp ';' ForNextExp ')' Stmt
       ;
@@ -126,57 +134,59 @@ Stmt  : ';'
 
 
 ForInitExp :
-           | Exp
+           | Exp     {Expression_clear(&$<expval>1);}
            | DeclVar
            ;
 ForCondExp :
-           | Exp
+           | Exp     {isExpConvToBool(&$<expval>1); Expression_clear(&$<expval>1);}
            ;
 ForNextExp :
-           | Exp
+           | Exp     {Expression_clear(&$<expval>1);}
            ;
 
 
 
-Exp  : VarAccess         {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
-     | VarAccess '=' Exp {free($<idval>1);}
-     | FuncCall
+Exp  : VarAccess   {if(isVarInit($<varval>1) == true) Expression_set(&$<expval>$, NULL, $<varval>1, NULL); else Expression_reset(&$<expval>$);}
+     | FuncCall    {if($<funcval>1 != NULL) Expression_set(&$<expval>$, &$<funcval>1->return_type, NULL, NULL); else Expression_reset(&$<expval>$);}
 
-     | INT_CONSTANT
-     | BOOL_CONSTANT
-     | DOUBLE_CONSTANT
-     | CHAR_CONSTANT
+     | INT_CONSTANT    {Expression_set(&$<expval>$, &Type_int   , NULL, &$1);}
+     | BOOL_CONSTANT   {Expression_set(&$<expval>$, &Type_bool  , NULL, &$1);}
+     | DOUBLE_CONSTANT {Expression_set(&$<expval>$, &Type_double, NULL, &$1);}
+     | CHAR_CONSTANT   {Expression_set(&$<expval>$, &Type_char  , NULL, &$1);}
+     | STRING_LITERAL  {Expression_set(&$<expval>$, &Type_string, NULL, &$1);}
 
-     | INC_OP VarAccess {checkIfVariableIsInitialized($<idval>2); free($<idval>2);}
-     | DEC_OP VarAccess {checkIfVariableIsInitialized($<idval>2); free($<idval>2);}
-     | VarAccess INC_OP {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
-     | VarAccess DEC_OP {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | Exp '=' Exp        {Expression_assign(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
 
-     | VarAccess ADD_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
-     | VarAccess SUB_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
-     | VarAccess MUL_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
-     | VarAccess DIV_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
-     | VarAccess MOD_ASSIGN Exp {checkIfVariableIsInitialized($<idval>1); free($<idval>1);}
+     | Exp ADD_ASSIGN Exp {Expression_addassign(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp SUB_ASSIGN Exp {Expression_subassign(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp MUL_ASSIGN Exp {Expression_mulassign(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp DIV_ASSIGN Exp {Expression_divassign(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp MOD_ASSIGN Exp {Expression_modassign(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
 
-     | Exp '+' Exp
-     | Exp '-' Exp
-     | Exp '*' Exp
-     | Exp '/' Exp
-     | Exp '%' Exp
-     | '-' Exp      %prec ','
+     | Exp '+' Exp            {Expression_add(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp '-' Exp            {Expression_sub(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp '*' Exp            {Expression_mul(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp '/' Exp            {Expression_div(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp '%' Exp            {Expression_mod(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | '-' Exp      %prec ',' {Expression_neg(&$<expval>2, &$<expval>$); Expression_clear(&$<expval>2);}
 
-     | '!' Exp
-     | Exp AND_OP Exp
-     | Exp OR_OP  Exp
+     | INC_OP Exp {Expression_preinc (&$<expval>2, &$<expval>$); Expression_clear(&$<expval>2);}
+     | DEC_OP Exp {Expression_predec (&$<expval>2, &$<expval>$); Expression_clear(&$<expval>2);}
+     | Exp DEC_OP {Expression_postinc(&$<expval>1, &$<expval>$); Expression_clear(&$<expval>1);}
+     | Exp INC_OP {Expression_postdec(&$<expval>1, &$<expval>$); Expression_clear(&$<expval>1);}
 
-     | Exp EQ_OP Exp
-     | Exp NE_OP Exp
-     | Exp LE_OP Exp
-     | Exp GE_OP Exp
-     | Exp  '<'  Exp
-     | Exp  '>'  Exp
+     | '!' Exp        {Expression_not(&$<expval>2, &$<expval>$); Expression_clear(&$<expval>2);}
+     | Exp AND_OP Exp {Expression_and(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp OR_OP  Exp {Expression_or (&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
 
-     | '(' Exp ')'
+     | Exp EQ_OP Exp {Expression_eq (&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp NE_OP Exp {Expression_neq(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp LE_OP Exp {Expression_leq(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp GE_OP Exp {Expression_geq(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp  '<'  Exp {Expression_low(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+     | Exp  '>'  Exp {Expression_gre(&$<expval>1, &$<expval>3, &$<expval>$); Expression_clear(&$<expval>1); Expression_clear(&$<expval>3);}
+
+     | '(' Exp ')'   {$<expval>$ = $<expval>2;}
      ;
 
 
@@ -195,15 +205,15 @@ TypePredef : INT
 /************************/
 
 
-DeclVar       : TypePredef ID               {long double val = 0; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, false, &val, &@2);}
-              | TypePredef ID ArrayDeclSize {long double val = 0; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, false, &val, &@2);}
-              | TypePredef ID '=' Exp       {Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, true, &$<strval>4, &@2);}
+DeclVar       : TypePredef ID               {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
+              | TypePredef ID ArrayDeclSize {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
+              | TypePredef ID '=' Exp       {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true , &@2); initVar(var, &$<expval>4); Expression_clear(&$<expval>4);}
 
-              | ID ID               {Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, false, &$1, &@2);}
-              | ID ID ArrayDeclSize {Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, false, &$1, &@2);}
-              | ID ID '=' Exp       {Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, true, &$<strval>4, &@2);}
+              | ID ID               {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
+              | ID ID ArrayDeclSize {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
+              | ID ID '=' Exp       {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true , &@2); initVar(var, &$<expval>4); Expression_clear(&$<expval>4);}
 
-              | CONST TypePredef ID '=' Exp {Type t = {$2, NULL}; declareVariable(&varlist, scope_level, $3, &t, true, true, &$<strval>5, &@3);}
+              | CONST TypePredef ID '=' Exp {Type t = {$2, NULL}; Variable* var = declareVariable(&varlist, scope_level, $3, &t, true, true, &@3); initVar(var, &$<expval>5); Expression_clear(&$<expval>5);}
               ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
@@ -229,8 +239,8 @@ DeclParamListNonEmpty : DeclParam                           {$<typelistval>$.ele
                       | DeclParamListNonEmpty ',' DeclParam {TypeList_insert(&$<typelistval>1, &$3); $<typelistval>$ = $<typelistval>1;}
                       ;
 
-DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; long double val = 0; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, true, &val, &@2);}
-                      | ID ID         {$$.type = CLASS; $$.class_name = $1; Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, true, NULL, &@2);}
+DeclParam             : TypePredef ID {$$.type = $1; $$.class_name = NULL; Type t = {$1, NULL}; declareVariable(&varlist, scope_level, $2, &t, false, true, &@2);}
+                      | ID ID         {$$.type = CLASS; $$.class_name = $1; Type t = {CLASS, $1}; declareVariable(&varlist, scope_level, $2, &t, false, true, &@2);}
                       ;
 
 
@@ -243,7 +253,7 @@ AccessModifier   : PUBLIC
                  | PRIVATE
                  ;
 
-DeclClass        : CLASS ID {enterBlock(); Type t = {CLASS, strdup($2)}; declareVariable(&varlist, scope_level, strdup("this"), &t, true, true, NULL, &yylloc);} '{' DeclClassMembers '}' {exitBlock();}
+DeclClass        : CLASS ID {enterBlock(); Type t = {CLASS, strdup($2)}; declareVariable(&varlist, scope_level, strdup("this"), &t, true, true, &yylloc);} '{' DeclClassMembers '}' {exitBlock();}
                  ;
 
 DeclClassMembers : DeclClassMember
@@ -260,10 +270,10 @@ DeclClassMember  : AccessModifier DeclVar ';'
 /* Variable access */
 /*******************/
 
-VarAccess       : ID                  {checkIfVariableIsDeclared($<idval>1);}
-                | ID VarAccessExtra   {checkIfVariableIsDeclared($<idval>1);}
-                | THIS                {checkIfVariableIsDeclared($<idval>1);}
-                | THIS VarAccessExtra {checkIfVariableIsDeclared($<idval>1);}
+VarAccess       : ID                  {$<varval>$ = isVarDecl($<idval>1); free($<idval>1);}
+                | ID VarAccessExtra   {$<varval>$ = NULL; isVarDecl($<idval>1); free($<idval>1);}
+                | THIS                {$<varval>$ = isVarDecl($<idval>1); free($<idval>1);}
+                | THIS VarAccessExtra {$<varval>$ = NULL; isVarDecl($<idval>1); free($<idval>1);}
                 ;
 
 VarAccessExtra  : '.' ID                       {free($2);}
@@ -272,8 +282,8 @@ VarAccessExtra  : '.' ID                       {free($2);}
                 | ArrayIndexing VarAccessExtra {}
                 ;
 
-ArrayIndexing   : '[' Exp ']'
-                | '[' Exp ']' ArrayIndexing
+ArrayIndexing   : '[' Exp ']'               {Expression_clear(&$<expval>2);}
+                | '[' Exp ']' ArrayIndexing {Expression_clear(&$<expval>2);}
                 ;
 
 
@@ -282,12 +292,12 @@ ArrayIndexing   : '[' Exp ']'
 /* Function call */
 /*****************/
 
-FuncCall         : VarAccess '(' FuncParamExpList ')' {/*checkIfFunctionIsDeclared($1, &$<typelistval>3); free($1); TypeList_clear(&$<typelistval>3);*/}
+FuncCall         : VarAccess '(' FuncParamExpList ')' {/*isFuncDecl($1, &$<typelistval>3); TypeList_clear(&$<typelistval>3);*/ $<funcval>$ = NULL;}
                  ;
 
 FuncParamExpList :
-                 | Exp                      {/*$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0; TypeList_insert(&$<typelistval>$, );*/}
-                 | FuncParamExpList ',' Exp
+                 | Exp                      {/*$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0; TypeList_insert(&$<typelistval>$, );*/ Expression_clear(&$<expval>1);}
+                 | FuncParamExpList ',' Exp {Expression_clear(&$<expval>3);}
                  ;
 
 
@@ -349,7 +359,7 @@ int main(int argc, char** argv)
 
 
 
-void declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, void* data, const YYLTYPE* yylloc)
+Variable* declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, const YYLTYPE* yylloc)
 {
     if(name == NULL)
     {
@@ -364,11 +374,11 @@ void declareVariable(VariableList* varlist, int scope_level, char* name, const T
     {
         if(varlist->elements[current_position].scope_level == scope_level)
         {
-            yyerror("variable %s is already declared at (%zu,%zu)", name, varlist->elements[current_position].decl_line, varlist->elements[current_position].decl_column);
-            return;
+            yyerror("variable %s was already declared at (%zu,%zu)", name, varlist->elements[current_position].decl_line, varlist->elements[current_position].decl_column);
+            return NULL;
         }
 
-        const int error = VariableList_replace(varlist, name, strlen(name), type, scope_level, constant, initialized, data, yylloc->first_line, yylloc->first_column, current_position);
+        const int error = VariableList_replace(varlist, name, strlen(name), type, scope_level, constant, initialized, yylloc->first_line, yylloc->first_column, current_position);
         if(error == -1)
         {
             yyerror("not enough memory to declare variable %s", name);
@@ -377,18 +387,18 @@ void declareVariable(VariableList* varlist, int scope_level, char* name, const T
     }
     else
     {
-        const int error = VariableList_insertAt(varlist, name, strlen(name), type, scope_level, constant, initialized, data, yylloc->first_line, yylloc->first_column, insert_position);
+        const int error = VariableList_insertAt(varlist, name, strlen(name), type, scope_level, constant, initialized, yylloc->first_line, yylloc->first_column, insert_position);
         if(error == -1)
         {
             yyerror("not enough memory to declare variable %s", name);
             abort();
         }
     }
+
+    return &varlist->elements[insert_position];
 }
 
-
-
-void declareFunction(FunctionList* funclist, int scope_level, char* name, const Type* return_type, TypeList* typelist, const YYLTYPE* yylloc)
+Function* declareFunction(FunctionList* funclist, int scope_level, char* name, const Type* return_type, TypeList* typelist, const YYLTYPE* yylloc)
 {
     if(name == NULL)
     {
@@ -403,8 +413,8 @@ void declareFunction(FunctionList* funclist, int scope_level, char* name, const 
     {
         if(funclist->elements[current_position].scope_level == scope_level)
         {
-            yyerror("function %s is already declared at (%zu,%zu)", name, funclist->elements[current_position].decl_line, funclist->elements[current_position].decl_column);
-            return;
+            yyerror("function %s was already declared at (%zu,%zu)", name, funclist->elements[current_position].decl_line, funclist->elements[current_position].decl_column);
+            return NULL;
         }
 
         const int error = FunctionList_replace(funclist, name, strlen(name), scope_level, return_type, typelist, yylloc->first_line, yylloc->first_column, current_position);
@@ -423,6 +433,8 @@ void declareFunction(FunctionList* funclist, int scope_level, char* name, const 
             abort();
         }
     }
+
+    return &funclist->elements[insert_position];
 }
 
 
@@ -452,22 +464,76 @@ void exitBlock()
 
 
 
-void checkIfVariableIsDeclared(const char* name)
+Variable* isVarDecl(const char* name)
 {
+    if(name == NULL)
+        return NULL;
+
     const int position = VariableList_find(&varlist, name, NULL);
     if(position == -1)
+    {
         yyerror("Variable %s is undeclared", name);
+        return NULL;
+    }
+
+    return &varlist.elements[position];
 }
-void checkIfVariableIsInitialized(const char* name)
+bool isVarInit(const Variable* var)
 {
-    const int position = VariableList_find(&varlist, name, NULL);
-    if(position >= 0 && varlist.elements[position].initialized == false)
-        yywarning("Variable %s was not explicitly initialized", name);
+    if(var == NULL)
+        return false;
+
+    if(var->initialized == false)
+        yywarning("Variable %s was not explicitly initialized", var->name);
+    return var->initialized;
+}
+void initVar(Variable* var, const Expression* exp)
+{
+    if(exp->type.type == INVAL_TYPE)
+        return;
+    if(Type_equal(&var->type, &exp->type) == false)
+    {
+        yyerror("the sides of '=' have different types");
+        return;
+    }
+
+    switch(var->type.type)
+    {
+    case INT:    var->intval    = exp->intval;    break;
+    case BOOL:   var->boolval   = exp->boolval;   break;
+    case DOUBLE: var->doubleval = exp->doubleval; break;
+    case CHAR:   var->charval   = exp->charval;   break;
+    case STRING: var->strval    = exp->strval;    break;
+    case CLASS:  break;
+    }
 }
 
-void checkIfFunctionIsDeclared(const char* name, const TypeList* typelist)
+Function* isFuncDecl(const char* name, const TypeList* typelist)
 {
+    if(name == NULL || typelist == NULL)
+        return NULL;
+
     const int position = FunctionList_find(&funclist, name, typelist, NULL);
     if(position == -1)
+    {
         yyerror("Function %s is undeclared", name);
+        return NULL;
+    }
+
+    return &funclist.elements[position];
+}
+
+bool isExpConvToBool(const Expression* exp)
+{
+    switch(exp->type.type)
+    {
+    case INT:
+    case BOOL:
+    case DOUBLE:
+    case CHAR:
+    case STRING:
+        return true;
+    }
+
+    return false;
 }

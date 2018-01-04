@@ -23,7 +23,12 @@ typedef struct Type
 } Type;
 
 const Type Type_invalid;
+const Type Type_int;
 const Type Type_bool;
+const Type Type_double;
+const Type Type_char;
+const Type Type_string;
+const Type Type_void;
 
 bool Type_equal(const Type* lval, const Type* rval);
 
@@ -77,11 +82,11 @@ int  VariableList_find(const VariableList* list, const char* name, int* insert_p
 int  VariableList_insertElement(VariableList* list, Variable* element, int position);
 
 int  VariableList_insertAt(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
-                           void* data, int decl_line, int decl_column, int position);
+                           int decl_line, int decl_column, int position);
 int  VariableList_insert(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
-                         void* data, int decl_line, int decl_column);
+                         int decl_line, int decl_column);
 int  VariableList_replace(VariableList* list, char* name, int name_length, const Type* type, int scope_level, bool constant, bool initialized,
-                          void* data, int decl_line, int decl_column, int position);
+                          int decl_line, int decl_column, int position);
 
 
 
@@ -164,16 +169,16 @@ typedef struct Expression
 } Expression;
 
 void Expression_set(Expression* exp, const Type* type, Variable* variable, void* data);
+void Expression_reset(Expression* exp);
 void Expression_clear(Expression* exp);
 
 void Expression_assign(const Expression* lval, const Expression* rval, Expression* result);
 
-void Expression_preinc (const Expression* val, Expression* result);
-void Expression_predec (const Expression* val, Expression* result);
-void Expression_postinc(const Expression* val, Expression* result);
-void Expression_postdec(const Expression* val, Expression* result);
-
 void Expression_addassign(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_subassign(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_mulassign(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_divassign(const Expression* lval, const Expression* rval, Expression* result);
+void Expression_modassign(const Expression* lval, const Expression* rval, Expression* result);
 
 void Expression_add(const Expression* lval, const Expression* rval, Expression* result);
 void Expression_sub(const Expression* lval, const Expression* rval, Expression* result);
@@ -181,6 +186,11 @@ void Expression_mul(const Expression* lval, const Expression* rval, Expression* 
 void Expression_div(const Expression* lval, const Expression* rval, Expression* result);
 void Expression_mod(const Expression* lval, const Expression* rval, Expression* result);
 void Expression_neg(const Expression* val, Expression* result);
+
+void Expression_preinc (const Expression* val, Expression* result);
+void Expression_predec (const Expression* val, Expression* result);
+void Expression_postinc(const Expression* val, Expression* result);
+void Expression_postdec(const Expression* val, Expression* result);
 
 void Expression_not(const Expression* val, Expression* result);
 void Expression_and(const Expression* lval, const Expression* rval, Expression* result);
