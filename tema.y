@@ -292,12 +292,23 @@ ArrayIndexing   : '[' Exp ']'               {Expression_clear(&$<expval>2);}
 /* Function call */
 /*****************/
 
-FuncCall         : VarAccess '(' FuncParamExpList ')' {/*isFuncDecl($1, &$<typelistval>3); TypeList_clear(&$<typelistval>3);*/ $<funcval>$ = NULL;}
+FuncCall         : FuncAccess '(' FuncParamExpList ')' {Function* func = isFuncDecl($<idval>1, &$<typelistval>3); $<funcval>$ = func; TypeList_clear(&$<typelistval>3); free($<idval>1);}
                  ;
 
-FuncParamExpList :
-                 | Exp                      {/*$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0; TypeList_insert(&$<typelistval>$, );*/ Expression_clear(&$<expval>1);}
-                 | FuncParamExpList ',' Exp {Expression_clear(&$<expval>3);}
+FuncParamExpList :                          {$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0;}
+                 | Exp                      {$<typelistval>$.elements = NULL; $<typelistval>$.capacity = 0; $<typelistval>$.size = 0; TypeList_insert(&$<typelistval>$, &$<expval>1.type); Expression_clear(&$<expval>1);}
+                 | FuncParamExpList ',' Exp {$<typelistval>$ = $<typelistval>1; TypeList_insert(&$<typelistval>$, &$<expval>3.type); Expression_clear(&$<expval>3);}
+                 ;
+
+FuncAccess       : ID                   {$<idval>$ = $<idval>1;}
+                 | ID FuncAccessExtra   {$<idval>$ = NULL; isVarDecl($<idval>1); free($<idval>1);}
+                 | THIS                 {$<idval>$ = $<idval>1;}
+                 | THIS FuncAccessExtra {$<idval>$ = NULL; isVarDecl($<idval>1); free($<idval>1);}
+                 ;
+
+FuncAccessExtra  : '.' ID                        {free($2);}
+                 | '.' ID FuncAccessExtra        {free($2);}
+                 | ArrayIndexing FuncAccessExtra {}
                  ;
 
 
@@ -413,7 +424,11 @@ Function* declareFunction(FunctionList* funclist, int scope_level, char* name, c
     {
         if(funclist->elements[current_position].scope_level == scope_level)
         {
-            yyerror("function %s was already declared at (%zu,%zu)", name, funclist->elements[current_position].decl_line, funclist->elements[current_position].decl_column);
+            yyerror("function %s was already declared at (%zu,%zu) with the following parameter types",
+                name, funclist->elements[current_position].decl_line, funclist->elements[current_position].decl_column);
+            fputc('\t', stderr);
+            TypeList_print(typelist, stderr);
+            fputc('\n', stderr);
             return NULL;
         }
 
@@ -516,7 +531,10 @@ Function* isFuncDecl(const char* name, const TypeList* typelist)
     const int position = FunctionList_find(&funclist, name, typelist, NULL);
     if(position == -1)
     {
-        yyerror("Function %s is undeclared", name);
+        yyerror("No function %s was declared with the following parameter types", name);
+        fputc('\t', stderr);
+        TypeList_print(typelist, stderr);
+        fputc('\n', stderr);
         return NULL;
     }
 

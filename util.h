@@ -1,6 +1,7 @@
 #ifndef INCLUDED_ITEM_H
 #define INCLUDED_ITEM_H
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -31,6 +32,7 @@ const Type Type_string;
 const Type Type_void;
 
 bool Type_equal(const Type* lval, const Type* rval);
+const char* Type_toString(const Type* type);
 
 
 
@@ -41,9 +43,10 @@ typedef struct TypeList
     int capacity;
 } TypeList;
 
-void TypeList_destroy(TypeList* list);
+void TypeList_clear(TypeList* list);
 int  TypeList_insert(TypeList* list, Type* element);
 bool TypeList_equal(const TypeList* llist, const TypeList* rlist);
+void TypeList_print(const TypeList* list, FILE* fp);
 
 
 

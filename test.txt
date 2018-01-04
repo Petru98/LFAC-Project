@@ -33,6 +33,10 @@ f();
 x.f;
 x.f();
 
+sum(x,x);
+sum(x,m);
+sum(m,x);
+
 b[6 * 2 - 4] = 2 + y;
 
 if(x > y)

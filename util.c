@@ -74,19 +74,34 @@ bool Type_equal(const Type* lval, const Type* rval)
 {
     return lval->type == rval->type && (lval->type != CLASS || strcmp(lval->class_name, rval->class_name) == 0);
 }
+const char* Type_toString(const Type* type)
+{
+    switch(type->type)
+    {
+    case INT:    return "int";
+    case BOOL:   return "bool";
+    case DOUBLE: return "double";
+    case CHAR:   return "char";
+    case STRING: return "string";
+    case CLASS:  return type->class_name;
+    }
+}
 
 
 
 void TypeList_clear(TypeList* list)
 {
-    for(int i = 0; i < list->size; ++i)
-        if(list->elements[i].type == CLASS)
-            free(list->elements[i].class_name);
+    if(list->capacity != 0)
+    {
+        for(int i = 0; i < list->size; ++i)
+            if(list->elements[i].type == CLASS)
+                free(list->elements[i].class_name);
 
-    free(list->elements);
-    list->elements = NULL;
-    list->capacity = 0;
-    list->size = 0;
+        free(list->elements);
+        list->elements = NULL;
+        list->capacity = 0;
+        list->size = 0;
+    }
 }
 
 int TypeList_insert(TypeList* list, Type* element)
@@ -125,6 +140,18 @@ bool TypeList_equal(const TypeList* llist, const TypeList* rlist)
     }
 
     return true;
+}
+
+void TypeList_print(const TypeList* list, FILE* fp)
+{
+    fprintf(fp, "(");
+    if(list->size >= 1)
+    {
+        fprintf(fp, "%s", Type_toString(&list->elements[0]));
+        for(int i = 1; i < list->size; ++i)
+            fprintf(fp, ", %s", Type_toString(&list->elements[i]));
+    }
+    fprintf(fp, ")");
 }
 
 
@@ -560,13 +587,16 @@ void Expression_set(Expression* exp, const Type* type, Variable* variable, void*
         {
             exp->type = (*type);
 
-            switch(type->type)
+            if(data != NULL)
             {
-            case INT:    exp->intval    = *((int*)   data); break;
-            case BOOL:   exp->boolval   = *((bool*)  data); break;
-            case DOUBLE: exp->doubleval = *((double*)data); break;
-            case CHAR:   exp->charval   = *((char*)  data); break;
-            case STRING: exp->strval    = *((char**) data); break;
+                switch(type->type)
+                {
+                case INT:    exp->intval    = *((int*)   data); break;
+                case BOOL:   exp->boolval   = *((bool*)  data); break;
+                case DOUBLE: exp->doubleval = *((double*)data); break;
+                case CHAR:   exp->charval   = *((char*)  data); break;
+                case STRING: exp->strval    = *((char**) data); break;
+                }
             }
         }
     }
