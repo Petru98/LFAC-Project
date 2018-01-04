@@ -173,6 +173,8 @@ void Expression_predec (const Expression* val, Expression* result);
 void Expression_postinc(const Expression* val, Expression* result);
 void Expression_postdec(const Expression* val, Expression* result);
 
+void Expression_addassign(const Expression* lval, const Expression* rval, Expression* result);
+
 void Expression_add(const Expression* lval, const Expression* rval, Expression* result);
 void Expression_sub(const Expression* lval, const Expression* rval, Expression* result);
 void Expression_mul(const Expression* lval, const Expression* rval, Expression* result);

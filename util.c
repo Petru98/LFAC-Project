@@ -578,10 +578,10 @@ void Expression_assign(const Expression* lval, const Expression* rval, Expressio
     case BOOL:   lval->variable->boolval   = rval->variable->boolval;   break;
     case DOUBLE: lval->variable->doubleval = rval->variable->doubleval; break;
     case CHAR:   lval->variable->charval   = rval->variable->charval;   break;
-    case STRING: free(lval->variable->strval); lval->variable->strval = rval->variable->strval;    break;
+    case STRING: free(lval->variable->strval); lval->variable->strval = rval->variable->strval; break;
     }
 
-    Expression_set(result, NULL, lval->variable, NULL);
+    (*result) = (*lval);
 }
 
 void Expression_preinc(const Expression* val, Expression* result)
@@ -598,15 +598,15 @@ void Expression_preinc(const Expression* val, Expression* result)
 
     switch(val->type.type)
     {
-    case INT:    ++val->variable->intval; break;
-    case BOOL:   ++val->variable->intval; break;
-    case DOUBLE: ++val->variable->intval; break;
-    case CHAR:   ++val->variable->intval; break;
+    case INT:    ++val->variable->intval;    break;
+    case BOOL:   ++val->variable->boolval;   break;
+    case DOUBLE: ++val->variable->doubleval; break;
+    case CHAR:   ++val->variable->charval;   break;
     case STRING: yyerror("preincrement is an invalid operation for string"); break;
     case CLASS:  yyerror("preincrement is an invalid operation for %s", val->type.class_name); break;
     }
 
-    Expression_set(result, NULL, val->variable, NULL);
+    (*result) = (*val);
 }
 void Expression_predec(const Expression* val, Expression* result)
 {
@@ -622,15 +622,15 @@ void Expression_predec(const Expression* val, Expression* result)
 
     switch(val->type.type)
     {
-    case INT:    --val->variable->intval; break;
-    case BOOL:   --val->variable->intval; break;
-    case DOUBLE: --val->variable->intval; break;
-    case CHAR:   --val->variable->intval; break;
+    case INT:    --val->variable->intval;    break;
+    case BOOL:   --val->variable->boolval;   break;
+    case DOUBLE: --val->variable->doubleval; break;
+    case CHAR:   --val->variable->charval;   break;
     case STRING: yyerror("predecrement is an invalid operation for string"); break;
     case CLASS:  yyerror("predecrement is an invalid operation for %s", val->type.class_name); break;
     }
 
-    Expression_set(result, NULL, val->variable, NULL);
+    (*result) = (*val);
 }
 void Expression_postinc(const Expression* val, Expression* result)
 {
@@ -646,10 +646,10 @@ void Expression_postinc(const Expression* val, Expression* result)
 
     switch(val->type.type)
     {
-    case INT:    Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
-    case BOOL:   Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
-    case DOUBLE: Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
-    case CHAR:   Expression_set(result, &val->type, NULL, &val->variable->intval); ++val->variable->intval; break;
+    case INT:    Expression_set(result, &val->type, NULL, &val->variable->intval);    ++val->variable->intval;    break;
+    case BOOL:   Expression_set(result, &val->type, NULL, &val->variable->boolval);   ++val->variable->boolval;   break;
+    case DOUBLE: Expression_set(result, &val->type, NULL, &val->variable->doubleval); ++val->variable->doubleval; break;
+    case CHAR:   Expression_set(result, &val->type, NULL, &val->variable->charval);   ++val->variable->charval;   break;
     case STRING: yyerror("postincrement is an invalid operation for string"); break;
     case CLASS:  yyerror("postincrement is an invalid operation for %s", val->type.class_name); break;
     }
@@ -668,10 +668,10 @@ void Expression_postdec(const Expression* val, Expression* result)
 
     switch(val->type.type)
     {
-    case INT:    Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
-    case BOOL:   Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
-    case DOUBLE: Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
-    case CHAR:   Expression_set(result, &val->type, NULL, &val->variable->intval); --val->variable->intval; break;
+    case INT:    Expression_set(result, &val->type, NULL, &val->variable->intval);    --val->variable->intval;    break;
+    case BOOL:   Expression_set(result, &val->type, NULL, &val->variable->boolval);   --val->variable->boolval;   break;
+    case DOUBLE: Expression_set(result, &val->type, NULL, &val->variable->doubleval); --val->variable->doubleval; break;
+    case CHAR:   Expression_set(result, &val->type, NULL, &val->variable->charval);   --val->variable->charval;   break;
     case STRING: yyerror("postdecrement is an invalid operation for string"); break;
     case CLASS:  yyerror("postdecrement is an invalid operation for %s", val->type.class_name); break;
     }
