@@ -209,4 +209,18 @@ void Expression_gre(const Expression* lval, const Expression* rval, Expression* 
 
 
 bool Expression_getBool(const Expression* val);
+
+
+
+/* PrintQueue */
+typedef struct PrintQueue
+{
+    long* elements;
+    int size;
+    int capacity;
+} PrintQueue;
+
+void PrintQueue_clear(PrintQueue* queue);
+int  PrintQueue_push(PrintQueue* queue, long value);
+
 #endif

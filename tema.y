@@ -17,8 +17,12 @@
 #include "util.h"
 
 int yylex();
+int yywrap();
 
 extern FILE* yyin;
+extern FILE* yyout;
+extern int error_count;
+extern int warning_count;
 int scope_level = 0;
 
 VariableList varlist = {0};
@@ -27,8 +31,13 @@ VariableListStack varliststack = {0};
 FunctionList funclist = {0};
 FunctionListStack funcliststack = {0};
 
+PrintQueue printqueue = {0};
+
+
+
 Variable* declareVariable(VariableList* varlist, int scope_level, char* name, const Type* type, bool constant, bool initialized, const YYLTYPE* yylloc);
 Function* declareFunction(FunctionList* funclist, int scope_level, char* name, const Type* return_type, TypeList* typelist, const YYLTYPE* yylloc);
+
 void enterBlock();
 void exitBlock();
 
@@ -39,6 +48,7 @@ void      initVar(Variable* var, const Expression* exp);
 Function* isFuncDecl(const char* name, const TypeList* typelist);
 
 bool isExpConvToBool(const Expression* exp);
+void addExpToPrint(const Expression* exp);
 %}
 
 /* Flags for yacc */
@@ -119,7 +129,7 @@ Stmt  : ';'
       | '{' {enterBlock();} Stmts '}' {exitBlock();}
       | '{''}'
 
-      | PRINT '(' Exp ')' ';'         {Expression_clear(&$<expval>3);}
+      | PRINT '(' Exp ')' ';'         {addExpToPrint(&$<expval>3); Expression_clear(&$<expval>3);}
       | RETURN Exp ';'                {Expression_clear(&$<expval>2);}
 
       | IF '(' Exp ')' Stmt           %prec NOELSE {isExpConvToBool(&$<expval>3); Expression_clear(&$<expval>3);}
@@ -207,13 +217,13 @@ TypePredef : INT
 
 DeclVar       : TypePredef ID               {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
               | TypePredef ID ArrayDeclSize {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
-              | TypePredef ID '=' Exp       {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true , &@2); initVar(var, &$<expval>4); Expression_clear(&$<expval>4);}
+              | TypePredef ID '=' Exp       {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true , &@2); if(var != NULL) initVar(var, &$<expval>4); Expression_clear(&$<expval>4);}
 
               | ID ID               {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
               | ID ID ArrayDeclSize {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, false, &@2);}
-              | ID ID '=' Exp       {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true , &@2); initVar(var, &$<expval>4); Expression_clear(&$<expval>4);}
+              | ID ID '=' Exp       {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true , &@2); if(var != NULL) initVar(var, &$<expval>4); Expression_clear(&$<expval>4);}
 
-              | CONST TypePredef ID '=' Exp {Type t = {$2, NULL}; Variable* var = declareVariable(&varlist, scope_level, $3, &t, true, true, &@3); initVar(var, &$<expval>5); Expression_clear(&$<expval>5);}
+              | CONST TypePredef ID '=' Exp {Type t = {$2, NULL}; Variable* var = declareVariable(&varlist, scope_level, $3, &t, true, true, &@3); if(var != NULL) initVar(var, &$<expval>5); Expression_clear(&$<expval>5);}
               ;
 
 ArrayDeclSize : '[' ConstIntExp ']'
@@ -260,8 +270,17 @@ DeclClassMembers : DeclClassMember
                  | DeclClassMembers DeclClassMember
                  ;
 
-DeclClassMember  : AccessModifier DeclVar ';'
+DeclClassMember  : AccessModifier ClassDeclVar ';'
                  | AccessModifier DeclFunc
+                 ;
+
+
+
+ClassDeclVar     : TypePredef ID               {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true, &@2);}
+                 | TypePredef ID ArrayDeclSize {Type t = {$1, NULL}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true, &@2);}
+
+                 | ID ID               {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true, &@2);}
+                 | ID ID ArrayDeclSize {Type t = {CLASS, $1}; Variable* var = declareVariable(&varlist, scope_level, $2, &t, false, true, &@2);}
                  ;
 
 
@@ -335,6 +354,18 @@ ConstIntExp : INT_CONSTANT
 /******************************************************************************/
 /*********************************** C code ***********************************/
 /******************************************************************************/
+int yywrap()
+{
+    if(error_count == 0)
+    {
+        for(int i = 0; i < printqueue.size; ++i)
+            fprintf(yyout, "%ld\n", printqueue.elements[i]);
+        PrintQueue_clear(&printqueue);
+    }
+
+    return 1;
+}
+
 void handleSIGSEGV(int s)
 {
     yyerror("SIGSEGV caught... aborting");
@@ -499,7 +530,7 @@ bool isVarInit(const Variable* var)
         return false;
 
     if(var->initialized == false)
-        yywarning("Variable %s was not explicitly initialized", var->name);
+        yyerror("Variable %s was not explicitly initialized", var->name);
     return var->initialized;
 }
 void initVar(Variable* var, const Expression* exp)
@@ -554,4 +585,21 @@ bool isExpConvToBool(const Expression* exp)
     }
 
     return false;
+}
+void addExpToPrint(const Expression* exp)
+{
+    if(exp->type.type == INVAL_TYPE)
+        return;
+
+    if(exp->type.type != INT)
+    {
+        yyerror("Invalid parameter of type %s. Function print has the following signature: void print(int)", Type_toString(&exp->type));
+        return;
+    }
+
+    if(PrintQueue_push(&printqueue, exp->intval) != 0)
+    {
+        yyerror("not enough memory to add integer to the print queue");
+        abort();
+    }
 }

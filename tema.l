@@ -14,6 +14,8 @@
 
 void skipMultilineComment();
 
+int error_count = 0;
+int warning_count = 0;
 size_t yycolumnno = 1;
 extern YYLTYPE yylloc;
 
@@ -180,6 +182,8 @@ void yyerror(const char* msg, ...)
     vfprintf(stderr, msg, args);
     fputc('\n', stderr);
     va_end(args);
+
+    ++error_count;
 }
 void yywarning(const char* msg, ...)
 {
@@ -189,6 +193,8 @@ void yywarning(const char* msg, ...)
     vfprintf(stderr, msg, args);
     fputc('\n', stderr);
     va_end(args);
+
+    ++warning_count;
 }
 
 void skipMultilineComment()

@@ -1258,3 +1258,40 @@ bool Expression_getBool(const Expression* val)
         abort();
     }
 }
+
+
+
+/* PrintQueue */
+void PrintQueue_clear(PrintQueue* queue)
+{
+    if(queue->capacity != 0)
+    {
+        free(queue->elements);
+        queue->elements = NULL;
+        queue->capacity = 0;
+        queue->size = 0;
+    }
+}
+
+int PrintQueue_push(PrintQueue* queue, long value)
+{
+    if(queue->size == queue->capacity)
+    {
+        int new_capacity = 1 + queue->capacity * 2;
+        long* new_queue = realloc(queue->elements, new_capacity * sizeof(queue->elements[0]));
+        if(new_queue == NULL)
+        {
+            int new_capacity = 1 + queue->capacity;
+            new_queue = realloc(queue->elements, new_capacity * sizeof(queue->elements[0]));
+            if(new_queue == NULL)
+                return -1;
+        }
+
+        queue->elements = new_queue;
+        queue->capacity = new_capacity;
+    }
+
+    queue->elements[queue->size] = value;
+    ++queue->size;
+    return 0;
+}
